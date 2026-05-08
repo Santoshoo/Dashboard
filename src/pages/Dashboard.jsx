@@ -4,15 +4,12 @@ import { LogOut, Clock, User, Info, FileText, CheckCircle, History, Trash2 } fro
 
 const DEFAULT_EMPLOYEES = [
   "SK. SAKIL",
-  "PRABODH CHANDRA PANDA",
   "LONALISA BADAJENA",
   "ASHABARI DHAL",
-  "PRADEEP KUMAR SAHOO",
   "BIKKU KUMAR",
   "MUKUL PATTNAIK",
   "MANASWINI BEHERA",
   "SANDEEP SAHOO",
-  "SUSANT KUMAR PRADHAN",
   "PRATIK RAY",
   "SATYAJEET SAHOO",
   "RAJESH OJHA",
@@ -21,17 +18,13 @@ const DEFAULT_EMPLOYEES = [
   "SUNIL KUMAR BARIK",
   "ANMOL NAYAK",
   "BIJAY KUMAR MAHARANA",
-  "DEBI PRASAD PANDA",
   "PANKAJ KUMAR DASH",
-  "SUDHANSU BALA SWAIN",
   "ABINASH DAS",
   "RANJIT SINGH PURTY",
   "SANJAY KUMAR SAHOO",
   "SUNITA ROUT",
-  "PAPU BEHERA",
   "GOPABANDHU BEHERA",
   "RAJEEB LOCHAN MISHRA",
-  "SUDARSHAN CHATTERJEE",
   "RITWIK NANDY",
   "SANTOSH KUMAR ROUT",
   "LABONI PRATIHAR",
@@ -49,9 +42,8 @@ const DEFAULT_EMPLOYEES = [
   "PRITIPUSPA BARIK",
   "JYOTIRANJAN NAYAK",
   "AMLAN NANDA",
-  "DEBASHIS PRADHAN",
   "BIJAYAKETAN SAHOO"
-];
+].sort((a, b) => a.localeCompare(b));
 
 const MANAGERS = [
   "MANASWINI BEHERA",
@@ -61,7 +53,7 @@ const MANAGERS = [
   "SOUMYARANJAN DAS",
   "SATYAJIT SAHOO",
   "ASHABARI DHAL"
-];
+].sort((a, b) => a.localeCompare(b));
 export default function Dashboard() {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
@@ -71,7 +63,7 @@ export default function Dashboard() {
   const [informTo, setInformTo] = useState('');
   const [purpose, setPurpose] = useState('');
 
-  // Search/Filter State
+  // Search/Filter State (searches employee name and whom to inform)
   const [searchName, setSearchName] = useState('');
 
   useEffect(() => {
@@ -136,14 +128,17 @@ export default function Dashboard() {
   // Active records (currently outside)
   const activeRecords = records.filter(r => !r.returnTime);
   
-  // History records (filtered by search if provided)
-  const historyRecords = records.filter(r => {
-    const isReturned = r.returnTime !== null;
-    if (searchName) {
-      return isReturned && r.employeeName.toLowerCase().includes(searchName.toLowerCase());
-    }
-    return isReturned;
-  });
+  // History records (filtered by search if provided). Search matches employee name OR whom to inform.
+  const historyRecords = records
+    .filter(r => r.returnTime !== null)
+    .filter(r => {
+      const q = searchName.trim().toLowerCase();
+      if (!q) return true;
+      const nameMatch = r.employeeName && r.employeeName.toLowerCase().includes(q);
+      const informMatch = r.informTo && r.informTo.toLowerCase().includes(q);
+      return nameMatch || informMatch;
+    })
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
   const formatTime = (isoString) => {
     if (!isoString) return '-';
@@ -193,15 +188,17 @@ export default function Dashboard() {
                 <form onSubmit={handleGoOut} className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
-                    <select
+                    <input
+                      list="employees-list"
                       className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white"
                       value={employeeName}
                       onChange={(e) => setEmployeeName(e.target.value)}
+                      placeholder="Type to search or select an employee"
                       required
-                    >
-                      <option value="" disabled>Select an employee</option>
-                      {DEFAULT_EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
-                    </select>
+                    />
+                    <datalist id="employees-list">
+                      {DEFAULT_EMPLOYEES.map(emp => <option key={emp} value={emp} />)}
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Whom to Inform</label>
@@ -298,7 +295,7 @@ export default function Dashboard() {
                 <div className="relative w-full sm:w-64">
                   <input
                     type="text"
-                    placeholder="Search employee..."
+                    placeholder="Search employee or whom to inform..."
                     className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     value={searchName}
                     onChange={(e) => setSearchName(e.target.value)}

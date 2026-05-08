@@ -5,15 +5,28 @@ import { LogIn } from 'lucide-react';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  // Replace or extend these credentials as needed.
+  const VALID_USERS = [
+    { username: 'admin', password: 'admin123' }
+  ];
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // Simulate login for admin panel
-    if (username && password) {
-      localStorage.setItem('isAdminLoggedIn', 'true');
-      navigate('/dashboard');
+    setError('');
+    const user = VALID_USERS.find(u => u.username === username.trim());
+    if (!user) {
+      setError('Invalid username');
+      return;
     }
+    if (user.password !== password) {
+      setError('Invalid password');
+      return;
+    }
+    localStorage.setItem('isAdminLoggedIn', 'true');
+    navigate('/dashboard');
   };
 
   return (
@@ -55,6 +68,9 @@ export default function Login() {
             Sign In
           </button>
         </form>
+        {error && (
+          <div className="mt-4 text-center text-sm text-red-600">{error}</div>
+        )}
       </div>
     </div>
   );
