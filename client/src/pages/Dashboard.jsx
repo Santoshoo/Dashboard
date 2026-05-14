@@ -51,7 +51,7 @@ export default function Dashboard() {
     // Auto-refresh every 3 seconds
     const dataInterval = setInterval(() => {
       fetchRecords(currentUser);
-    }, 3000);
+    }, 0);
 
     return () => {
       clearInterval(clockInterval);
@@ -206,12 +206,12 @@ export default function Dashboard() {
   const activeRecords = records.filter(r => {
     const isOut = !r.returnTime;
     if (!isOut) return false;
-    if (!user) return true; 
+    if (!user) return true;
     return (isAdmin || isPublic) ? true : r.employeeName === user.username;
   });
 
-  const { 
-    paginatedData: paginatedActiveRecords, 
+  const {
+    paginatedData: paginatedActiveRecords,
     paginationInfo: activePaginationInfo,
     goToPage: goToActivePage
   } = usePagination(activeRecords, 6);
@@ -517,7 +517,7 @@ export default function Dashboard() {
                           <p className="text-[10px] font-black text-orange-600 leading-none">{formatTime(record.outTime)}</p>
                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Out</p>
                         </div>
-                        
+
                         {isAdmin ? (
                           <div className="h-8 px-4 bg-orange-50 text-orange-700 rounded-lg text-[10px] font-black flex items-center justify-center border border-orange-100 whitespace-nowrap min-w-[100px]">
                             <Clock className="w-3 h-3 mr-1.5 animate-pulse" />
@@ -537,11 +537,11 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-              
+
               <div className="mt-4">
-                <Pagination 
-                  {...activePaginationInfo} 
-                  onPageChange={goToActivePage} 
+                <Pagination
+                  {...activePaginationInfo}
+                  onPageChange={goToActivePage}
                 />
               </div>
             </div>
@@ -650,8 +650,8 @@ export default function Dashboard() {
                                 <button
                                   onClick={() => handleToggleEmployee(emp.id, emp.name, active)}
                                   className={`px-3 py-1 rounded-full text-xs font-black border transition-all duration-200 ${active
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                      : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
                                     }`}
                                   title={active ? 'Click to deactivate' : 'Click to activate'}
                                 >
