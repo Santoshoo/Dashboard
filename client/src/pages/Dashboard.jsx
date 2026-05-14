@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Clock, User, Info, FileText, CheckCircle, History, Trash2, MapPin, MessageSquare, Search, UserCheck, Shield, Sparkles, ChevronRight, Plus, X, Users, AlertCircle } from 'lucide-react';
 import { MANAGERS, LOCATIONS } from '../constants';
+import { usePagination, Pagination } from '../utils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -197,16 +198,23 @@ export default function Dashboard() {
     }
   };
 
-  if (!user) return null;
-
-  const isAdmin = user.role === 'admin';
-  const isPublic = user.role === 'public';
+  const isAdmin = user?.role === 'admin';
+  const isPublic = user?.role === 'public';
 
   const activeRecords = records.filter(r => {
     const isOut = !r.returnTime;
     if (!isOut) return false;
+    if (!user) return true; 
     return (isAdmin || isPublic) ? true : r.employeeName === user.username;
   });
+
+  const { 
+    paginatedData: paginatedActiveRecords, 
+    paginationInfo: activePaginationInfo,
+    goToPage: goToActivePage
+  } = usePagination(activeRecords, 6);
+
+  if (!user) return null;
 
   const formatTime = (isoString) => {
     if (!isoString) return '-';
@@ -464,59 +472,68 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-2">
-              {activeRecords.map(record => (
-                <div key={record.id} className="bg-white rounded-xl border border-slate-100 p-2.5 px-6 shadow-sm hover:shadow-md transition-all duration-300 group">
-                  <div className="grid grid-cols-2 md:grid-cols-4 items-center gap-4">
-                    {/* Column 1: Identity */}
-                    <div className="flex items-center min-w-0">
-                      <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 group-hover:bg-emerald-50 transition-colors shrink-0">
-                        <User className="w-4 h-4 text-slate-400 group-hover:text-emerald-500" />
+              <div className="space-y-2">
+                {paginatedActiveRecords.map(record => (
+                  <div key={record.id} className="bg-white rounded-xl border border-slate-100 p-2.5 px-6 shadow-sm hover:shadow-md transition-all duration-300 group">
+                    <div className="grid grid-cols-2 md:grid-cols-4 items-center gap-4">
+                      {/* Column 1: Identity */}
+                      <div className="flex items-center min-w-0">
+                        <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center mr-3 group-hover:bg-emerald-50 transition-colors shrink-0">
+                          <User className="w-4 h-4 text-slate-400 group-hover:text-emerald-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-black text-slate-900 truncate">{record.employeeName}</h4>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Staff Member</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-black text-slate-900 truncate">{record.employeeName}</h4>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Staff Member</p>
-                      </div>
-                    </div>
 
-                    {/* Column 2: Time & Inform To */}
-                    <div className="hidden md:flex flex-col text-[10px] font-bold text-slate-500">
-                      <div className="flex items-center">
-                        <Clock className="w-3 h-3 text-orange-500 mr-2 shrink-0" />
-                        <span>Out: <span className="text-slate-900">{formatTime(record.outTime)}</span></span>
+                      {/* Column 2: Time & Inform To */}
+                      <div className="hidden md:flex flex-col text-[10px] font-bold text-slate-500">
+                        <div className="flex items-center">
+                          <Clock className="w-3 h-3 text-orange-500 mr-2 shrink-0" />
+                          <span>Out: <span className="text-slate-900">{formatTime(record.outTime)}</span></span>
+                        </div>
+                        <div className="flex items-center mt-1 ml-5 opacity-60">
+                          <span>Inform: {record.informTo}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center mt-1 ml-5 opacity-60">
-                        <span>Inform: {record.informTo}</span>
-                      </div>
-                    </div>
 
-                    {/* Column 3: Location & Purpose */}
-                    <div className="hidden md:flex flex-col text-[10px] font-bold text-slate-500 min-w-0">
-                      <div className="flex items-center">
-                        <MapPin className="w-3 h-3 text-slate-400 mr-2 shrink-0" />
-                        <span className="truncate">To: <span className="text-slate-900">{record.visitLocation}</span></span>
+                      {/* Column 3: Location & Purpose */}
+                      <div className="hidden md:flex flex-col text-[10px] font-bold text-slate-500 min-w-0">
+                        <div className="flex items-center">
+                          <MapPin className="w-3 h-3 text-slate-400 mr-2 shrink-0" />
+                          <span className="truncate">To: <span className="text-slate-900">{record.visitLocation}</span></span>
+                        </div>
+                        <div className="flex items-center mt-1 ml-5 opacity-60">
+                          <span className="truncate">"{record.purpose}"</span>
+                        </div>
                       </div>
-                      <div className="flex items-center mt-1 ml-5 opacity-60">
-                        <span className="truncate">"{record.purpose}"</span>
-                      </div>
-                    </div>
 
-                    {/* Column 4: Return Button */}
-                    <div className="flex justify-end items-center">
-                      <div className="md:hidden text-right mr-3">
-                        <p className="text-[10px] font-black text-orange-600 leading-none">{formatTime(record.outTime)}</p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Out</p>
+                      {/* Column 4: Return Button */}
+                      <div className="flex justify-end items-center">
+                        <div className="md:hidden text-right mr-3">
+                          <p className="text-[10px] font-black text-orange-600 leading-none">{formatTime(record.outTime)}</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Out</p>
+                        </div>
+                        <button
+                          onClick={() => handleReturn(record.id)}
+                          className="h-8 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg text-[10px] font-black transition-all duration-300 flex items-center justify-center border border-emerald-100 hover:border-emerald-600 whitespace-nowrap min-w-[100px]"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5 mr-2" />
+                          Return
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleReturn(record.id)}
-                        className="h-8 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg text-[10px] font-black transition-all duration-300 flex items-center justify-center border border-emerald-100 hover:border-emerald-600 whitespace-nowrap min-w-[100px]"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5 mr-2" />
-                        Return
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              
+              <div className="mt-4">
+                <Pagination 
+                  {...activePaginationInfo} 
+                  onPageChange={goToActivePage} 
+                />
+              </div>
             </div>
           )}
         </div>

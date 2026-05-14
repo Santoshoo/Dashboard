@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, History, Trash2, MapPin, MessageSquare, Search, Shield, Sparkles, LogOut, ChevronLeft, Calendar, X } from 'lucide-react';
+import { usePagination, Pagination } from '../utils';
 
 export default function Records() {
   const navigate = useNavigate();
@@ -57,9 +58,7 @@ export default function Records() {
     window.location.href = '/';
   };
 
-  if (!user) return null;
-
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user?.role === 'admin';
 
   const historyRecords = records
     .filter(r => r.returnTime !== null)
@@ -77,6 +76,14 @@ export default function Records() {
       return nameMatch || informMatch;
     })
     .sort((a, b) => new Date(b.outTime) - new Date(a.outTime));
+
+  const {
+    paginatedData: paginatedHistoryRecords,
+    paginationInfo: historyPaginationInfo,
+    goToPage: goToHistoryPage
+  } = usePagination(historyRecords, 10);
+
+  if (!user) return null;
 
   const formatTime = (isoString) => {
     if (!isoString) return '-';
@@ -229,7 +236,7 @@ export default function Records() {
                     </td>
                   </tr>
                 ) : (
-                  historyRecords.map((record) => (
+                  paginatedHistoryRecords.map((record) => (
                     <tr key={record.id} className="hover:bg-slate-50/30 transition-colors group">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
@@ -272,6 +279,10 @@ export default function Records() {
               </tbody>
             </table>
           </div>
+          <Pagination 
+            {...historyPaginationInfo} 
+            onPageChange={goToHistoryPage} 
+          />
         </div>
       </main>
     </div>
