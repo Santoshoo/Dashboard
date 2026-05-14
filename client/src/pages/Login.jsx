@@ -25,8 +25,8 @@ export default function Login() {
       const data = await response.json();
 
       if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('currentUser', JSON.stringify({
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('currentUser', JSON.stringify({
           ...data.user,
           isLoggedIn: true
         }));

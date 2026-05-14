@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const userData = localStorage.getItem('currentUser');
+    const userData = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
     let currentUser;
     if (!userData) {
       currentUser = { username: 'Public User', role: 'public' };
@@ -142,6 +142,8 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('token');
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');
     setUser(null);
@@ -509,19 +511,27 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* Column 4: Return Button */}
+                      {/* Column 4: Actions (Public) or Status (Admin) */}
                       <div className="flex justify-end items-center">
                         <div className="md:hidden text-right mr-3">
                           <p className="text-[10px] font-black text-orange-600 leading-none">{formatTime(record.outTime)}</p>
                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Out</p>
                         </div>
-                        <button
-                          onClick={() => handleReturn(record.id)}
-                          className="h-8 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg text-[10px] font-black transition-all duration-300 flex items-center justify-center border border-emerald-100 hover:border-emerald-600 whitespace-nowrap min-w-[100px]"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 mr-2" />
-                          Return
-                        </button>
+                        
+                        {isAdmin ? (
+                          <div className="h-8 px-4 bg-orange-50 text-orange-700 rounded-lg text-[10px] font-black flex items-center justify-center border border-orange-100 whitespace-nowrap min-w-[100px]">
+                            <Clock className="w-3 h-3 mr-1.5 animate-pulse" />
+                            Currently Out
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleReturn(record.id)}
+                            className="h-8 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg text-[10px] font-black transition-all duration-300 flex items-center justify-center border border-emerald-100 hover:border-emerald-600 whitespace-nowrap min-w-[100px]"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 mr-2" />
+                            Return
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

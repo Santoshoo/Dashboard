@@ -11,7 +11,8 @@ export default function Records() {
   const [filterDate, setFilterDate] = useState('');
 
   useEffect(() => {
-    const userData = localStorage.getItem('currentUser');
+    const userData = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
+
     let currentUser;
     if (!userData) {
       currentUser = { username: 'Public User', role: 'public' };
@@ -53,8 +54,11 @@ export default function Records() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('token');
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');
+
     window.location.href = '/';
   };
 
