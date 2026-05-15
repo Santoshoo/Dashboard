@@ -27,7 +27,19 @@ export default function Dashboard() {
   const [newEmpName, setNewEmpName] = useState('');
   const [empError, setEmpError] = useState('');
   const [empSuccess, setEmpSuccess] = useState('');
+  const [empSearchQuery, setEmpSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Auto-clear feedback messages
+  useEffect(() => {
+    if (empSuccess || empError) {
+      const timer = setTimeout(() => {
+        setEmpSuccess('');
+        setEmpError('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [empSuccess, empError]);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
@@ -229,7 +241,6 @@ export default function Dashboard() {
       {/* ── Slide-in Drawer ── */}
       {/* Backdrop */}
       <div
-        onClick={() => setShowForm(false)}
         className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 ${showForm ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       />
 
@@ -554,7 +565,6 @@ export default function Dashboard() {
             {/* Backdrop */}
             <div
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
-              onClick={() => setShowEmpMasterModal(false)}
             />
 
             {/* Modal Content */}
@@ -625,7 +635,24 @@ export default function Dashboard() {
 
                 {/* Employee List */}
                 <div>
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-4">Current Employees</h4>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Current Employees</h4>
+                    
+                    {/* Master Search Bar */}
+                    <div className="relative flex-1 max-w-xs">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-3 w-3 text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search ID or Name..."
+                        className="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 text-[10px] font-bold outline-none"
+                        value={empSearchQuery}
+                        onChange={(e) => setEmpSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="border border-slate-100 rounded-2xl overflow-hidden max-h-72 overflow-y-auto">
                     <table className="min-w-full">
                       <thead className="sticky top-0">
@@ -636,7 +663,13 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {employees.map(emp => {
+                        {employees
+                          .filter(emp => emp.isActive !== false) // Only show active employees
+                          .filter(emp => 
+                            emp.id.toLowerCase().includes(empSearchQuery.toLowerCase()) || 
+                            emp.name.toLowerCase().includes(empSearchQuery.toLowerCase())
+                          )
+                          .map(emp => {
                           const active = emp.isActive !== false; // treat NULL as active
                           return (
                             <tr key={emp.id} className={`hover:bg-slate-50/50 transition-colors ${!active ? 'opacity-50' : ''}`}>
@@ -649,13 +682,14 @@ export default function Dashboard() {
                               <td className="px-5 py-3 whitespace-nowrap text-center">
                                 <button
                                   onClick={() => handleToggleEmployee(emp.id, emp.name, active)}
-                                  className={`px-3 py-1 rounded-full text-xs font-black border transition-all duration-200 ${active
+                                  className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black border transition-all duration-200 ${active
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                     : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
                                     }`}
                                   title={active ? 'Click to deactivate' : 'Click to activate'}
                                 >
-                                  {active ? '● Active' : '○ Inactive'}
+                                  <span className="mr-1.5 leading-none">●</span>
+                                  {active ? 'ACTIVE' : 'INACTIVE'}
                                 </button>
                               </td>
                             </tr>
