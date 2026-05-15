@@ -17,13 +17,13 @@ router.get('/', async (req, res) => {
 // Add a new employee (Admin only)
 router.post('/', async (req, res) => {
   try {
-    const { id, name } = req.body;
+    const { id, name, department } = req.body;
     if (!id || !name) return res.status(400).json({ message: 'ID and Name are required' });
 
     const existing = await Employee.findByPk(id);
     if (existing) return res.status(409).json({ message: 'Employee ID already exists' });
 
-    const employee = await Employee.create({ id, name, isActive: true });
+    const employee = await Employee.create({ id, name, department, isActive: true });
     res.status(201).json(employee);
   } catch (error) {
     console.error(error);

@@ -14,6 +14,10 @@ const Employee = sequelize.define('Employee', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     allowNull: false,
+  },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true,
   }
 }, {
   timestamps: false,

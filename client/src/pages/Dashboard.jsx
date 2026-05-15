@@ -21,10 +21,12 @@ export default function Dashboard() {
   const [visitLocation, setVisitLocation] = useState('');
   const [customLocation, setCustomLocation] = useState('');
   const [purpose, setPurpose] = useState('');
+  const [selectedDept, setSelectedDept] = useState('');
 
   // Employee Master State (Admin only)
   const [newEmpId, setNewEmpId] = useState('');
   const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpDept, setNewEmpDept] = useState('');
   const [empError, setEmpError] = useState('');
   const [empSuccess, setEmpSuccess] = useState('');
   const [empSearchQuery, setEmpSearchQuery] = useState('');
@@ -181,13 +183,18 @@ export default function Dashboard() {
       const res = await fetch('http://localhost:5000/api/employees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: newEmpId.trim(), name: newEmpName.trim() })
+        body: JSON.stringify({ 
+          id: newEmpId.trim(), 
+          name: newEmpName.trim(),
+          department: newEmpDept
+        })
       });
       const data = await res.json();
       if (res.ok) {
         setEmpSuccess(`"${newEmpName.trim()}" added successfully.`);
         setNewEmpId('');
         setNewEmpName('');
+        setNewEmpDept('');
         fetchEmployees();
       } else {
         setEmpError(data.message || 'Failed to add employee.');
@@ -268,6 +275,32 @@ export default function Dashboard() {
         {/* Drawer Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <form onSubmit={handleGoOut} className="space-y-5">
+            {/* Select Location/Department */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Location</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                </div>
+                <select
+                  className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all duration-300 bg-white font-bold text-xs text-slate-700 cursor-pointer outline-none appearance-none"
+                  value={selectedDept}
+                  onChange={(e) => {
+                    setSelectedDept(e.target.value);
+                    setEmployeeName('');
+                  }}
+                  required
+                >
+                  <option value="" disabled>Choose Location...</option>
+                  <option value="IT DATA CENTER">IT DATA CENTER</option>
+                  <option value="IT COMMAND CENTER">IT COMMAND CENTER</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  <ChevronRight className="h-3 w-3 text-slate-400 rotate-90" />
+                </div>
+              </div>
+            </div>
+
             {/* Select Person */}
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Select Person</label>
@@ -280,12 +313,18 @@ export default function Dashboard() {
                   value={employeeName}
                   onChange={(e) => setEmployeeName(e.target.value)}
                   required
+                  disabled={!selectedDept}
                 >
-                  <option value="" disabled>Choose a name...</option>
-                  {employees.filter(emp => emp.isActive !== false).map(emp => (
-                    <option key={emp.id} value={emp.name}>{emp.name}</option>
-                  ))}
+                  <option value="" disabled>{selectedDept ? 'Choose a name...' : 'First select location'}</option>
+                  {employees
+                    .filter(emp => emp.isActive !== false && emp.department === selectedDept)
+                    .map(emp => (
+                      <option key={emp.id} value={emp.name}>{emp.name}</option>
+                    ))}
                 </select>
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  <ChevronRight className="h-3 w-3 text-slate-400 rotate-90" />
+                </div>
               </div>
             </div>
 
@@ -609,6 +648,16 @@ export default function Dashboard() {
                       onChange={(e) => setNewEmpName(e.target.value)}
                       required
                     />
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all duration-300 bg-white font-bold text-xs text-slate-700 cursor-pointer outline-none appearance-none"
+                      value={newEmpDept}
+                      onChange={(e) => setNewEmpDept(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled>Assign Location...</option>
+                      <option value="IT DATA CENTER">IT DATA CENTER</option>
+                      <option value="IT COMMAND CENTER">IT COMMAND CENTER</option>
+                    </select>
                     <button
                       type="submit"
                       className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md transition-all duration-300 hover:-translate-y-0.5"
