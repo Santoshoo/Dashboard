@@ -519,11 +519,6 @@ export default function Dashboard() {
                         </div>
 
                         {isAdmin ? (
-                          <div className="h-8 px-4 bg-orange-50 text-orange-700 rounded-lg text-[10px] font-black flex items-center justify-center border border-orange-100 whitespace-nowrap min-w-[100px]">
-                            <Clock className="w-3 h-3 mr-1.5 animate-pulse" />
-                            Currently Out
-                          </div>
-                        ) : (
                           <button
                             onClick={() => handleReturn(record.id)}
                             className="h-8 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg text-[10px] font-black transition-all duration-300 flex items-center justify-center border border-emerald-100 hover:border-emerald-600 whitespace-nowrap min-w-[100px]"
@@ -531,6 +526,11 @@ export default function Dashboard() {
                             <CheckCircle className="w-3.5 h-3.5 mr-2" />
                             Return
                           </button>
+                        ) : (
+                          <div className="h-8 px-4 bg-orange-50 text-orange-700 rounded-lg text-[10px] font-black flex items-center justify-center border border-orange-100 whitespace-nowrap min-w-[100px]">
+                            <Clock className="w-3 h-3 mr-1.5 animate-pulse" />
+                            Currently Out
+                          </div>
                         )}
                       </div>
                     </div>

@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, History, Trash2, MapPin, MessageSquare, Search, Shield, Sparkles, LogOut, ChevronLeft, Calendar, X } from 'lucide-react';
+import { Clock, History, Trash2, MapPin, MessageSquare, Search, Shield, Sparkles, LogOut, ChevronLeft, Calendar, X, FileDown } from 'lucide-react';
 import { usePagination, Pagination } from '../utils';
+import * as XLSX from 'xlsx';
 
 export default function Records() {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [user, setUser] = useState(null);
   const [searchName, setSearchName] = useState('');
-  const [filterDate, setFilterDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const userData = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
@@ -62,15 +64,38 @@ export default function Records() {
     window.location.href = '/';
   };
 
+  const handleExportExcel = () => {
+    // Prepare data for export
+    const exportData = historyRecords.map(record => ({
+      'Employee Name': record.employeeName,
+      'Informed To': record.informTo,
+      'Out Date': new Date(record.outTime).toLocaleDateString(),
+      'Out Time': formatTime(record.outTime),
+      'Return Date': new Date(record.returnTime).toLocaleDateString(),
+      'Return Time': formatTime(record.returnTime),
+      'Destination': record.visitLocation || '-',
+      'Purpose': record.purpose
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Movements");
+
+    // Generate filename with current date
+    const filename = `KIMS_Movements_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+  };
+
   const isAdmin = user?.role === 'admin';
 
   const historyRecords = records
     .filter(r => r.returnTime !== null)
     .filter(r => {
-      // Date filter
-      if (filterDate) {
+      // Date Range filter
+      if (startDate || endDate) {
         const recordDate = new Date(r.outTime).toISOString().slice(0, 10);
-        if (recordDate !== filterDate) return false;
+        if (startDate && recordDate < startDate) return false;
+        if (endDate && recordDate > endDate) return false;
       }
       // Name search filter
       const q = searchName.trim().toLowerCase();
@@ -186,25 +211,43 @@ export default function Records() {
                 />
               </div>
 
-              {/* Date filter */}
-              <div className="relative md:w-48">
+              {/* Start Date filter */}
+              <div className="relative md:w-44">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Calendar className="h-3.5 w-3.5 text-slate-400" />
                 </div>
                 <input
                   type="date"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all duration-300 text-xs font-bold outline-none cursor-pointer"
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all duration-300 text-[10px] font-black outline-none cursor-pointer uppercase"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  title="Start Date"
+                />
+              </div>
+
+              <div className="hidden md:block text-slate-300 font-black">→</div>
+
+              {/* End Date filter */}
+              <div className="relative md:w-44">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                </div>
+                <input
+                  type="date"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all duration-300 text-[10px] font-black outline-none cursor-pointer uppercase"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  title="End Date"
                 />
               </div>
 
               {/* Clear Filter */}
-              {(searchName || filterDate) && (
+              {(searchName || startDate || endDate) && (
                 <button
                   onClick={() => {
                     setSearchName('');
-                    setFilterDate('');
+                    setStartDate('');
+                    setEndDate('');
                   }}
                   className="flex items-center justify-center p-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors duration-300 border border-red-100"
                   title="Clear Filters"
@@ -212,6 +255,15 @@ export default function Records() {
                   <X className="w-4 h-4" />
                 </button>
               )}
+
+              {/* Export Button */}
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-300 shadow-lg shadow-emerald-900/20 text-[10px] font-black uppercase tracking-wider"
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                Export Excel
+              </button>
             </div>
           </div>
 

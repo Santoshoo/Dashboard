@@ -48,7 +48,8 @@ export const MANAGERS = [
   "SK SAKIL",
   "SOUMYARANJAN DAS",
   "SATYAJIT SAHOO",
-  "ASHABARI DHAL"
+  "ASHABARI DHAL",
+  "LONALISA BADAJENA"
 ].sort((a, b) => a.localeCompare(b));
 
 export const LOCATIONS = [
