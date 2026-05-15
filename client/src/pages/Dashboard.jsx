@@ -51,7 +51,7 @@ export default function Dashboard() {
     // Auto-refresh every 3 seconds
     const dataInterval = setInterval(() => {
       fetchRecords(currentUser);
-    }, 0);
+    }, 3000);
 
     return () => {
       clearInterval(clockInterval);
