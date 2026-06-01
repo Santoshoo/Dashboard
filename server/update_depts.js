@@ -7,20 +7,21 @@ const updateDepartments = async () => {
     await sequelize.sync({ alter: true });
 
     const dataCenter = [
-      'Rajesh Ojha', 'Dibya Kishor Bishi', 'Bijay Kumar Maharana', 'Rajat Ku Mohanty', 
-      'Sanjay Kumar Sahoo', 'Sashikanta Behera', 'Rajesh Kumar Bal', 'Susant Kumar Pradhan', 
-      'Ranjit Singh Purty', 'Sandeep Sahoo', 'Sunil Kumar Barik', 'Gopabandhu Behera', 
-      'Pankaj Kumar Dash', 'Rajeeb Lochan Mishra', 'Babul Patra', 'Satwik Kanungo', 
-      'Satyabrata swain', 'Pradeep Kumar Sahoo', 'Papu Behera'
+      'Rajesh Ojha', 'Dibya Kishor Bishi', 'Bijay Kumar Maharana', 'Rajat Ku Mohanty',
+      'Sanjay Kumar Sahoo', 'Sashikanta Behera', 'Rajesh Kumar Bal', 'Susant Kumar Pradhan',
+      'Ranjit Singh Purty', 'Sandeep Sahoo', 'Sunil Kumar Barik', 'Gopabandhu Behera',
+      'Pankaj Kumar Dash', 'Rajeeb Lochan Mishra', 'Babul Patra', 'Satwik Kanungo',
+      'Satyabrata swain', 'Pradeep Kumar Sahoo', 'Papu Behera', 'Manaswini Behera',
+      'Laboni Pratihar'
     ];
 
     const commandCenter = [
-      'Manaswini Behera', 'Lonalisa Badajena', 'Mukul Pattnaik', 'Abinash Das', 
-      'Ritwik Nandy', 'Satyajeet Sahoo', 'Laboni Pratihar', 'Bikku Kumar', 
-      'Diptiranjan Nayak', 'Sunita Rout', 'Anmol Nayak', 'Santosh Kumar Rout', 
-      'Suchismita Dash', 'Ashabari Dhal', 'Mitali Madhusmita Sahoo', 'Pratik Ray', 
-      'Tapaswini Ojha', 'Ananya Mahapatra', 'Pritipuspa Barik', 'Md Danish Alam', 
-      'Sidhanta Barik', 'Santosh Kumar Sahoo', 'Rikon kumar parida', 'Soumya Ranjan Das', 
+      'S.K. Sakil', 'Lonalisa Badajena', 'Mukul Pattnaik', 'Abinash Das',
+      'Ritwik Nandy', 'Satyajeet Sahoo', 'Bikku Kumar', 'Diptiranjan Nayak',
+      'Sunita Rout', 'Anmol Nayak', 'Santosh Kumar Rout', 'Suchismita Dash',
+      'Ashabari Dhal', 'Mitali Madhusmita Sahoo', 'Pratik Ray', 'Tapaswini Ojha',
+      'Ananya Mahapatra', 'Pritipuspa Barik', 'Md Danish Alam', 'Sidhanta Barik',
+      'Santosh Kumar Sahoo', 'Rikon kumar parida', 'Soumya Ranjan Das',
       'Jyotiranjan Nayak', 'Amlan Nanda', 'BijayaKetan Sahoo'
     ];
 

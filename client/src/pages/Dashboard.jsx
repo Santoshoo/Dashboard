@@ -49,6 +49,17 @@ export default function Dashboard() {
   const [customLocation, setCustomLocation] = useState('');
   const [purpose, setPurpose] = useState('');
 
+  // Reset form when drawer toggles or location changes
+  useEffect(() => {
+    setEmployeeSearchInput('');
+    setEmployeeName('');
+    setInformTo('');
+    setCustomInformTo('');
+    setVisitLocation('');
+    setCustomLocation('');
+    setPurpose('');
+  }, [showForm, selectedLocation]);
+
   // Employee Master State (Admin only)
   const [newEmpId, setNewEmpId] = useState('');
   const [newEmpName, setNewEmpName] = useState('');
@@ -581,6 +592,15 @@ export default function Dashboard() {
 
                 {isAdmin ? (
                   <>
+                    {user?.role === 'SUPER_ADMIN' && (
+                      <button
+                        onClick={() => navigate('/admin-management')}
+                        className="hidden md:flex items-center bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] transition-all duration-300 px-5 py-2.5 rounded-2xl text-sm font-bold border border-[#D4AF37]/20 mr-2"
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Management
+                      </button>
+                    )}
                     <button
                       onClick={() => setShowEmpMasterModal(true)}
                       className="hidden md:flex items-center bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] transition-all duration-300 px-5 py-2.5 rounded-2xl text-sm font-bold border border-[#D4AF37]/20"
