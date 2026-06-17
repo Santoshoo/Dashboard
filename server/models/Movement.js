@@ -41,6 +41,10 @@ const Movement = sequelize.define('Movement', {
   employeeDepartment: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  timeline: {
+    type: DataTypes.JSON,
+    allowNull: true,
   }
 }, {
   timestamps: true,

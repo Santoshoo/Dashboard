@@ -8,6 +8,26 @@ const { authenticate, authorizeRoles } = require('../middleware/auth');
 router.post('/', async (req, res) => {
   try {
     const { id, employeeName, employeeId, outTime, informTo, visitLocation, purpose, date, employeeDepartment } = req.body;
+
+    // Check if employee already has an active movement
+    const activeMovement = await Movement.findOne({
+      where: {
+        employeeName,
+        returnTime: null
+      }
+    });
+
+    if (activeMovement) {
+      return res.status(400).json({ message: 'Employee is already out. Please return first or add a new location to the current trip.' });
+    }
+
+    // Initialize timeline with the first assignment
+    const initialTimeline = [{
+      location: visitLocation,
+      purpose: purpose,
+      timestamp: outTime
+    }];
+
     const movement = await Movement.create({
       id,
       employeeName,
@@ -17,7 +37,8 @@ router.post('/', async (req, res) => {
       visitLocation,
       purpose,
       date,
-      employeeDepartment
+      employeeDepartment,
+      timeline: initialTimeline
     });
     res.status(201).json(movement);
   } catch (error) {
@@ -63,6 +84,45 @@ router.put('/:id/return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), 
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error updating return time' });
+  }
+});
+
+// Add new location to existing movement
+router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newLocation, newPurpose } = req.body;
+
+    const movement = await Movement.findByPk(id);
+    if (!movement) return res.status(404).json({ message: 'Movement not found' });
+
+    if (movement.returnTime) {
+      return res.status(400).json({ message: 'Cannot add location to a returned movement' });
+    }
+
+    // Append to timeline
+    const currentTimeline = movement.timeline || [{
+      location: movement.visitLocation,
+      purpose: movement.purpose,
+      timestamp: movement.outTime
+    }];
+
+    currentTimeline.push({
+      location: newLocation,
+      purpose: newPurpose,
+      timestamp: new Date().toISOString()
+    });
+
+    movement.timeline = currentTimeline;
+    movement.visitLocation = movement.visitLocation ? `${movement.visitLocation} -> ${newLocation}` : newLocation;
+    movement.purpose = movement.purpose ? `${movement.purpose} | ${newPurpose}` : newPurpose;
+    
+    await movement.save();
+
+    res.json(movement);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error adding new location' });
   }
 });
 
