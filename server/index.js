@@ -23,12 +23,15 @@ app.use('/api/movements', movementRoutes);
 app.use('/api/employees', employeeRoutes);
 
 // Static file serving for deployment
-app.use(express.static(path.join(__dirname, '../client/dist')));
+const distPath = path.join(__dirname, 'dist');
+
+app.use(express.static(distPath));
 
 // Catch-all to serve index.html for React Router (client-side routing)
+// Excludes /api routes so they return proper JSON responses
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   } else {
     next();
   }
@@ -68,7 +71,7 @@ const seedEmployees = async () => {
       { id: "210919", name: "Jyotiranjan Nayak", department: "IT COMMAND CENTER" },
       { id: "211210", name: "Amlan Nanda", department: "IT COMMAND CENTER" },
       { id: "211604", name: "BijayaKetan Sahoo", department: "IT COMMAND CENTER" },
-      
+
       // IT DATA CENTER
       { id: "203146", name: "Rajesh Ojha", department: "IT DATA CENTER" },
       { id: "107200", name: "Dibya Kishor Bishi", department: "IT DATA CENTER" },
@@ -108,19 +111,19 @@ const startServer = async () => {
 
     // Fix existing employees with NULL department (migration)
     const dataCenterNames = [
-      'Rajesh Ojha', 'Dibya Kishor Bishi', 'Bijay Kumar Maharana', 'Rajat Ku Mohanty', 
-      'Sanjay Kumar Sahoo', 'Sashikanta Behera', 'Rajesh Kumar Bal', 'Susant Kumar Pradhan', 
-      'Ranjit Singh Purty', 'Sandeep Sahoo', 'Sunil Kumar Barik', 'Gopabandhu Behera', 
-      'Pankaj Kumar Dash', 'Rajeeb Lochan Mishra', 'Babul Patra', 'Satwik Kanungo', 
+      'Rajesh Ojha', 'Dibya Kishor Bishi', 'Bijay Kumar Maharana', 'Rajat Ku Mohanty',
+      'Sanjay Kumar Sahoo', 'Sashikanta Behera', 'Rajesh Kumar Bal', 'Susant Kumar Pradhan',
+      'Ranjit Singh Purty', 'Sandeep Sahoo', 'Sunil Kumar Barik', 'Gopabandhu Behera',
+      'Pankaj Kumar Dash', 'Rajeeb Lochan Mishra', 'Babul Patra', 'Satwik Kanungo',
       'Satyabrata swain', 'Pradeep Kumar Sahoo', 'Papu Behera'
     ];
     const commandCenterNames = [
-      'Manaswini Behera', 'Lonalisa Badajena', 'Mukul Pattnaik', 'Abinash Das', 
-      'Ritwik Nandy', 'Satyajeet Sahoo', 'Laboni Pratihar', 'Bikku Kumar', 
-      'Diptiranjan Nayak', 'Sunita Rout', 'Anmol Nayak', 'Santosh Kumar Rout', 
-      'Suchismita Dash', 'Ashabari Dhal', 'Mitali Madhusmita Sahoo', 'Pratik Ray', 
-      'Tapaswini Ojha', 'Ananya Mahapatra', 'Pritipuspa Barik', 'Md Danish Alam', 
-      'Sidhanta Barik', 'Santosh Kumar Sahoo', 'Rikon kumar parida', 'Soumya Ranjan Das', 
+      'Manaswini Behera', 'Lonalisa Badajena', 'Mukul Pattnaik', 'Abinash Das',
+      'Ritwik Nandy', 'Satyajeet Sahoo', 'Laboni Pratihar', 'Bikku Kumar',
+      'Diptiranjan Nayak', 'Sunita Rout', 'Anmol Nayak', 'Santosh Kumar Rout',
+      'Suchismita Dash', 'Ashabari Dhal', 'Mitali Madhusmita Sahoo', 'Pratik Ray',
+      'Tapaswini Ojha', 'Ananya Mahapatra', 'Pritipuspa Barik', 'Md Danish Alam',
+      'Sidhanta Barik', 'Santosh Kumar Sahoo', 'Rikon kumar parida', 'Soumya Ranjan Das',
       'Jyotiranjan Nayak', 'Amlan Nanda', 'BijayaKetan Sahoo'
     ];
 
@@ -137,9 +140,9 @@ const startServer = async () => {
       );
     }
     console.log('✅ Migrated NULL department values for existing employees');
-    
+
     await seedEmployees();
-    
+
     // Seed Super Admin if not exists
     const adminCount = await Admin.count();
     if (adminCount === 0) {
@@ -153,7 +156,7 @@ const startServer = async () => {
       });
       console.log('🌱 Super Admin seeded successfully (admin/admin123)');
     }
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });

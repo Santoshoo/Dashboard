@@ -847,7 +847,17 @@ export default function Dashboard() {
                   
                   // Compute timeline for UI
                   let displayTimeline = record.timeline;
-                  if (!displayTimeline && record.visitLocation) {
+                  
+                  // Safely parse timeline if it was stored as a JSON string in the database
+                  if (typeof displayTimeline === 'string') {
+                    try {
+                      displayTimeline = JSON.parse(displayTimeline);
+                    } catch (e) {
+                      displayTimeline = null;
+                    }
+                  }
+
+                  if ((!displayTimeline || !Array.isArray(displayTimeline)) && record.visitLocation) {
                     const locations = record.visitLocation.split('->').map(s => s.trim());
                     const purposes = record.purpose ? record.purpose.split('|').map(s => s.trim()) : [];
                     displayTimeline = locations.map((loc, idx) => ({
@@ -855,6 +865,11 @@ export default function Dashboard() {
                       purpose: purposes[idx] || record.purpose,
                       timestamp: record.outTime // Fallback timestamp for legacy records
                     }));
+                  }
+                  
+                  // Final fallback to prevent .map crashes
+                  if (!Array.isArray(displayTimeline)) {
+                    displayTimeline = [];
                   }
 
                   return (
