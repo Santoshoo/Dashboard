@@ -914,15 +914,15 @@ export default function Dashboard() {
                             <MapPin className="w-4 h-4 text-[#D4AF37] mr-2 shrink-0 mt-0.5" />
                             <div className="flex flex-col min-w-0">
                               <span className="uppercase tracking-wider shrink-0 mb-1">To:</span>
-                              <span className="text-(--industrial-text) whitespace-normal wrap-break-word leading-relaxed">
-                                {record.visitLocation}
+                              <span className="text-(--industrial-text) whitespace-normal wrap-break-word leading-relaxed font-bold">
+                                {record.visitLocation ? record.visitLocation.split('->')[0].trim() : '-'}
                               </span>
                             </div>
                           </div>
                           <div className="flex items-start mt-2 ml-1 opacity-80">
                             <span className="text-[#D4AF37] mr-1 shrink-0 mt-0.5">↳</span> 
-                            <span className="italic whitespace-normal wrap-break-word leading-relaxed min-w-0">
-                              "{record.purpose}"
+                            <span className="font-black text-blue-500 whitespace-normal wrap-break-word leading-relaxed min-w-0">
+                              "{record.purpose ? record.purpose.split('|')[0].trim() : ''}"
                             </span>
                           </div>
                         </div>
@@ -943,17 +943,19 @@ export default function Dashboard() {
                           {isAdmin ? (
                             canMarkReturn(record) ? (
                               <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    setCurrentRecordId(record.id);
-                                    setShowAddLocationModal(true);
-                                  }}
-                                  className="h-10 lg:h-12 px-3 lg:px-4 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
-                                  title="Add Location"
-                                >
-                                  <MapPin className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2" />
-                                  <span className="hidden lg:inline">Add</span>
-                                </button>
+                                {(record.visitLocation ? record.visitLocation.split('->').length : 1) < 5 && (
+                                  <button
+                                    onClick={() => {
+                                      setCurrentRecordId(record.id);
+                                      setShowAddLocationModal(true);
+                                    }}
+                                    className="h-10 lg:h-12 px-3 lg:px-4 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                    title="Add Location"
+                                  >
+                                    <MapPin className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2" />
+                                    <span className="hidden lg:inline">Add</span>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleReturn(record.id)}
                                   className="h-10 lg:h-12 px-4 lg:px-6 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0B0F19] rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-[#D4AF37]/30 hover:border-[#D4AF37] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
@@ -976,7 +978,7 @@ export default function Dashboard() {
                           )}
                           
                           {/* Timeline Toggle Button */}
-                          {displayTimeline && displayTimeline.length > 0 && (
+                          {displayTimeline && displayTimeline.length > 1 && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -992,21 +994,21 @@ export default function Dashboard() {
                       </div>
 
                       {/* Expandable Timeline Section */}
-                      {displayTimeline && displayTimeline.length > 0 && expandedRecords[record.id] && (
+                      {displayTimeline && displayTimeline.length > 1 && expandedRecords[record.id] && (
                         <div className="mt-6 pt-6 border-t border-(--industrial-border) animate-in slide-in-from-top-2 fade-in duration-300">
                           <h5 className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.2em] mb-4">Movement Timeline</h5>
                           <div className="relative pl-6 space-y-6">
                             {/* Vertical Line */}
                             <div className="absolute left-2.75 top-2 bottom-2 w-0.5 bg-(--industrial-border)"></div>
                             
-                            {displayTimeline.map((item, index) => (
+                            {displayTimeline.slice(1).map((item, index) => (
                               <div key={index} className="relative flex items-start justify-between">
                                 {/* Dot */}
                                 <div className="absolute -left-5.5 top-1 w-3 h-3 rounded-full border-2 border-[#D4AF37] bg-(--industrial-card) shadow-[0_0_8px_rgba(212,175,55,0.5)]"></div>
                                 
                                 <div className="flex-1 pr-4">
                                   <p className="text-sm font-black text-(--industrial-text)">
-                                    <span className="text-[#D4AF37] mr-2">Assignment {index + 1}</span>
+                                    <span className="text-[#D4AF37] mr-2">Assignment {index + 2}</span>
                                     - Out to {item.location}
                                     <span className="text-(--industrial-text-muted) italic font-bold ml-2">"{item.purpose}"</span>
                                   </p>

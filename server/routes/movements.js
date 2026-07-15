@@ -100,20 +100,36 @@ router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADM
       return res.status(400).json({ message: 'Cannot add location to a returned movement' });
     }
 
-    // Append to timeline
-    const currentTimeline = movement.timeline || [{
+    const currentLocationsCount = movement.visitLocation ? movement.visitLocation.split('->').length : 1;
+    if (currentLocationsCount >= 5) {
+      return res.status(400).json({ message: 'Cannot add more than 5 locations.' });
+    }
+
+    // Safely parse timeline if it's a string from the database
+    let parsedTimeline = movement.timeline;
+    if (typeof parsedTimeline === 'string') {
+      try {
+        parsedTimeline = JSON.parse(parsedTimeline);
+      } catch (e) {
+        parsedTimeline = null;
+      }
+    }
+
+    // Ensure it's an array, otherwise fall back to creating a new one
+    const currentTimeline = Array.isArray(parsedTimeline) ? parsedTimeline : [{
       location: movement.visitLocation,
       purpose: movement.purpose,
       timestamp: movement.outTime
     }];
 
-    currentTimeline.push({
+    const newTimeline = [...currentTimeline, {
       location: newLocation,
       purpose: newPurpose,
       timestamp: new Date().toISOString()
-    });
+    }];
 
-    movement.timeline = currentTimeline;
+    movement.timeline = newTimeline;
+    movement.changed('timeline', true);
     movement.visitLocation = movement.visitLocation ? `${movement.visitLocation} -> ${newLocation}` : newLocation;
     movement.purpose = movement.purpose ? `${movement.purpose} | ${newPurpose}` : newPurpose;
     

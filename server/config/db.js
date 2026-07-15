@@ -9,6 +9,7 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     dialect: 'mysql',
     logging: false, // Set to console.log if you want to see SQL queries
+    timezone: '+05:30',
   }
 );
 
