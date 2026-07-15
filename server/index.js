@@ -9,7 +9,9 @@ const movementRoutes = require('./routes/movements');
 const employeeRoutes = require('./routes/employees');
 const Employee = require('./models/Employee');
 const Admin = require('./models/Admin');
+const Movement = require('./models/Movement');
 const bcrypt = require('bcryptjs');
+const cron = require('node-cron');
 
 const app = express();
 
@@ -156,6 +158,39 @@ const startServer = async () => {
       });
       console.log('🌱 Super Admin seeded successfully (admin/admin123)');
     }
+
+    // Cron job to auto-return employees at 9 PM (21:00)
+    cron.schedule('0 21 * * *', async () => {
+      try {
+        const now = new Date();
+        console.log(`[Cron] Running auto-return check at ${now.toISOString()}`);
+        
+        const openMovements = await Movement.findAll({
+          where: { returnTime: null }
+        });
+
+        if (openMovements.length > 0) {
+          for (const movement of openMovements) {
+            movement.returnTime = now;
+            let currentTimeline = movement.timeline || [];
+            if (typeof currentTimeline === 'string') {
+              try { currentTimeline = JSON.parse(currentTimeline); } catch (e) { currentTimeline = []; }
+            }
+            currentTimeline.push({
+              time: now,
+              status: 'Auto-Returned at 9 PM by System'
+            });
+            movement.timeline = currentTimeline;
+            await movement.save();
+          }
+          console.log(`[Cron] Auto-returned ${openMovements.length} employees.`);
+        } else {
+          console.log('[Cron] No open movements found to auto-return.');
+        }
+      } catch (error) {
+        console.error('[Cron] Error during auto-return job:', error);
+      }
+    });
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
