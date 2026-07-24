@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Clock, User, Info, FileText, CheckCircle, History, Trash2, MapPin, MessageSquare, Search, UserCheck, Shield, Sparkles, ChevronRight, ChevronDown, ChevronUp, Plus, X, Users, AlertCircle, Sun, Moon } from 'lucide-react';
+import { LogOut, Clock, User, Info, FileText, CheckCircle, History, Trash2, MapPin, MessageSquare, Search, UserCheck, Shield, Sparkles, ChevronRight, ChevronDown, ChevronUp, Plus, X, Users, AlertCircle, Sun, Moon, Pencil } from 'lucide-react';
 import { MANAGERS, LOCATIONS, MANAGER_LOCATIONS } from '../constants';
 import { usePagination, Pagination } from '../utils';
 
@@ -55,6 +55,16 @@ export default function Dashboard() {
   const [addVisitLocation, setAddVisitLocation] = useState('');
   const [addCustomLocation, setAddCustomLocation] = useState('');
   const [addPurpose, setAddPurpose] = useState('');
+
+  // Edit Active Movement State (Admin & Super Admin)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editRecordId, setEditRecordId] = useState(null);
+  const [editEmployeeName, setEditEmployeeName] = useState('');
+  const [editRecordDept, setEditRecordDept] = useState('');
+  const [editInformTo, setEditInformTo] = useState('');
+  const [editCustomInformTo, setEditCustomInformTo] = useState('');
+  const [editTimeline, setEditTimeline] = useState([]);
+  const [editFormError, setEditFormError] = useState('');
 
   // Form State
   const [formError, setFormError] = useState('');
@@ -270,6 +280,129 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Failed to add location:', err);
+    }
+  };
+
+  const handleOpenEditModal = (record) => {
+    setEditRecordId(record.id);
+    setEditEmployeeName(record.employeeName);
+    setEditRecordDept(record.employeeDepartment || selectedLocation);
+
+    const isStandardManager = MANAGERS.includes(record.informTo);
+    if (isStandardManager) {
+      setEditInformTo(record.informTo);
+      setEditCustomInformTo('');
+    } else {
+      setEditInformTo('Others');
+      setEditCustomInformTo(record.informTo);
+    }
+
+    let parsedTimeline = record.timeline;
+    if (typeof parsedTimeline === 'string') {
+      try { parsedTimeline = JSON.parse(parsedTimeline); } catch (e) { parsedTimeline = null; }
+    }
+    if (!Array.isArray(parsedTimeline) || parsedTimeline.length === 0) {
+      if (record.visitLocation) {
+        const locs = record.visitLocation.split('->').map(s => s.trim());
+        const purps = record.purpose ? record.purpose.split('|').map(s => s.trim()) : [];
+        parsedTimeline = locs.map((loc, idx) => ({
+          location: loc,
+          purpose: purps[idx] || record.purpose || '',
+          timestamp: record.outTime || new Date().toISOString()
+        }));
+      } else {
+        parsedTimeline = [{ location: '', purpose: '', timestamp: record.outTime || new Date().toISOString() }];
+      }
+    }
+
+    setEditTimeline(parsedTimeline.map(item => ({ ...item })));
+    setEditFormError('');
+    setShowEditModal(true);
+  };
+
+  const getFilteredEditEmployees = () => {
+    const targetDept = editRecordDept || selectedLocation;
+    let filtered = employees.filter(emp => emp.isActive !== false && emp.department === targetDept);
+    if (filtered.length === 0) {
+      filtered = employees.filter(emp => emp.isActive !== false);
+    }
+    return filtered;
+  };
+
+  const handleEditTimelineItem = (index, field, value) => {
+    setEditTimeline(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditFormError('');
+
+    const finalInformTo = editInformTo === 'Others' ? editCustomInformTo : editInformTo;
+    if (!editEmployeeName || !finalInformTo) {
+      setEditFormError('Please fill in Employee Name and Informed Manager.');
+      return;
+    }
+
+    for (let i = 0; i < editTimeline.length; i++) {
+      if (!editTimeline[i].location.trim() || !editTimeline[i].purpose.trim()) {
+        setEditFormError(`Please fill in location and purpose for Assignment ${i + 1}.`);
+        return;
+      }
+    }
+
+    const token = sessionStorage.getItem('token');
+    try {
+      const response = await fetch(`/api/movements/${editRecordId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employeeName: editEmployeeName,
+          informTo: finalInformTo,
+          timeline: editTimeline
+        })
+      });
+
+      if (response.ok) {
+        fetchRecords(user);
+        setShowEditModal(false);
+        setEditRecordId(null);
+      } else {
+        const data = await response.json();
+        setEditFormError(data.message || 'Failed to update movement.');
+      }
+    } catch (err) {
+      console.error('Failed to update movement:', err);
+      setEditFormError('Server error. Please try again.');
+    }
+  };
+
+  const handleDeleteActiveRecord = async (id, empName) => {
+    if (!window.confirm(`Are you sure you want to delete the active movement record for "${empName}"?`)) return;
+
+    const token = sessionStorage.getItem('token');
+    try {
+      const response = await fetch(`/api/movements/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        fetchRecords(user);
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to delete record.');
+      }
+    } catch (err) {
+      console.error('Failed to delete record:', err);
     }
   };
 
@@ -943,6 +1076,28 @@ export default function Dashboard() {
                           {isAdmin ? (
                             canMarkReturn(record) ? (
                               <div className="flex gap-2">
+                                {/* Edit Button for Admin & Super Admin */}
+                                <button
+                                  onClick={() => handleOpenEditModal(record)}
+                                  className="h-10 lg:h-12 px-3 lg:px-4 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                  title="Edit Movement (Fix Mistake)"
+                                >
+                                  <Pencil className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-1.5" />
+                                  <span className="hidden lg:inline">Edit</span>
+                                </button>
+
+                                {/* Delete Button for Super Admin only */}
+                                {user?.role === 'SUPER_ADMIN' && (
+                                  <button
+                                    onClick={() => handleDeleteActiveRecord(record.id, record.employeeName)}
+                                    className="h-10 lg:h-12 px-3 lg:px-4 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-red-500/30 hover:border-red-500 hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                    title="Delete Active Movement"
+                                  >
+                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-1.5" />
+                                    <span className="hidden lg:inline">Delete</span>
+                                  </button>
+                                )}
+
                                 {(record.visitLocation ? record.visitLocation.split('->').length : 1) < 5 && (
                                   <button
                                     onClick={() => {
@@ -1263,6 +1418,142 @@ export default function Dashboard() {
                   >
                     <MapPin className="w-5 h-5 mr-2.5" />
                     Add to Route
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Edit Active Movement Modal (Admin & Super Admin) ── */}
+        {isAdmin && showEditModal && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-(--industrial-bg)/80 backdrop-blur-sm transition-opacity duration-300"
+              onClick={() => setShowEditModal(false)}
+            />
+
+            {/* Modal Content */}
+            <div className="relative w-full max-w-lg bg-(--industrial-card) border border-(--industrial-border) rounded-4xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-(--industrial-border) bg-(--industrial-text)/5 flex items-center justify-between">
+                <h3 className="text-lg font-black text-(--industrial-text) flex items-center">
+                  <div className="w-8 h-8 bg-amber-500/20 rounded-xl flex items-center justify-center mr-3">
+                    <Pencil className="w-4 h-4 text-amber-400" />
+                  </div>
+                  Edit Movement Record
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-(--industrial-text)/5 text-(--industrial-text-muted) hover:text-(--industrial-text) transition-all duration-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 max-h-[75vh] overflow-y-auto">
+                <form onSubmit={handleEditSubmit} className="space-y-4">
+                  {/* Employee Name Dropdown (Location-Wise) */}
+                  <div>
+                    <label className="block text-[10px] font-black text-(--industrial-text-muted) uppercase tracking-widest mb-1.5 ml-1">
+                      Employee Name ({editRecordDept || selectedLocation})
+                    </label>
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all duration-300 bg-(--industrial-text)/5 font-bold text-xs text-(--industrial-text) cursor-pointer outline-none appearance-none"
+                      value={editEmployeeName}
+                      onChange={(e) => setEditEmployeeName(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled className="bg-(--industrial-card) text-(--industrial-text)">Select Employee...</option>
+                      {editEmployeeName && !getFilteredEditEmployees().some(e => e.name === editEmployeeName) && (
+                        <option value={editEmployeeName} className="bg-(--industrial-card) text-(--industrial-text)">
+                          {editEmployeeName} (Current)
+                        </option>
+                      )}
+                      {getFilteredEditEmployees().map(emp => (
+                        <option key={emp.id} value={emp.name} className="bg-(--industrial-card) text-(--industrial-text)">
+                          {emp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Informed To */}
+                  <div>
+                    <label className="block text-[10px] font-black text-(--industrial-text-muted) uppercase tracking-widest mb-1.5 ml-1">Informed To (Manager/HOD)</label>
+                    <select
+                      className="w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all duration-300 bg-(--industrial-text)/5 font-bold text-xs text-(--industrial-text) cursor-pointer outline-none appearance-none"
+                      value={editInformTo}
+                      onChange={(e) => setEditInformTo(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled className="bg-(--industrial-card) text-(--industrial-text)">Select Manager</option>
+                      {getFilteredManagers().map(m => <option key={m} value={m} className="bg-(--industrial-card) text-(--industrial-text)">{m}</option>)}
+                      <option value="Others" className="bg-(--industrial-card) text-(--industrial-text)">Others</option>
+                    </select>
+                    {editInformTo === 'Others' && (
+                      <input
+                        type="text"
+                        className="mt-2 w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all duration-300 bg-(--industrial-text)/5 text-xs font-bold text-(--industrial-text) outline-none"
+                        placeholder="Enter custom manager name"
+                        value={editCustomInformTo}
+                        onChange={(e) => setEditCustomInformTo(e.target.value)}
+                        required
+                      />
+                    )}
+                  </div>
+
+                  {/* Itemized Assignment Steps */}
+                  <div className="pt-3 border-t border-(--industrial-border)">
+                    <label className="block text-[10px] font-black text-amber-400 uppercase tracking-widest mb-3">
+                      Edit Assignment Steps ({editTimeline.length} {editTimeline.length === 1 ? 'Step' : 'Steps'})
+                    </label>
+                    <div className="space-y-4">
+                      {editTimeline.map((item, index) => (
+                        <div key={index} className="p-3.5 rounded-2xl bg-(--industrial-text)/5 border border-(--industrial-border) space-y-2.5">
+                          <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-wider block">
+                            Assignment {index + 1}
+                          </span>
+                          <div>
+                            <label className="block text-[9px] font-bold text-(--industrial-text-muted) uppercase mb-1">Destination Location</label>
+                            <input
+                              type="text"
+                              className="w-full px-3 py-2 rounded-lg border border-(--industrial-border) focus:ring-2 focus:ring-amber-500/20 bg-(--industrial-card) text-xs font-bold text-(--industrial-text) outline-none"
+                              value={item.location}
+                              onChange={(e) => handleEditTimelineItem(index, 'location', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold text-(--industrial-text-muted) uppercase mb-1">Purpose of Visit</label>
+                            <input
+                              type="text"
+                              className="w-full px-3 py-2 rounded-lg border border-(--industrial-border) focus:ring-2 focus:ring-amber-500/20 bg-(--industrial-card) text-xs font-bold text-(--industrial-text) outline-none"
+                              value={item.purpose}
+                              onChange={(e) => handleEditTimelineItem(index, 'purpose', e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {editFormError && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      {editFormError}
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    className="w-full flex justify-center items-center py-3 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg shadow-amber-500/30 uppercase tracking-widest mt-4"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Save Changes
                   </button>
                 </form>
               </div>

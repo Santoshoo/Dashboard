@@ -47,6 +47,35 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Helper function to ensure timeline is always a valid parsed array
+const normalizeTimeline = (record) => {
+  let timeline = record.timeline;
+  if (typeof timeline === 'string') {
+    try {
+      timeline = JSON.parse(timeline);
+    } catch (e) {
+      timeline = null;
+    }
+  }
+
+  if (Array.isArray(timeline) && timeline.length > 0) {
+    return timeline;
+  }
+
+  // Fallback: Reconstruct timeline from concatenated fields if timeline is missing
+  if (record.visitLocation) {
+    const locations = record.visitLocation.split('->').map(s => s.trim());
+    const purposes = record.purpose ? record.purpose.split('|').map(s => s.trim()) : [];
+    return locations.map((loc, idx) => ({
+      location: loc,
+      purpose: purposes[idx] || record.purpose || '',
+      timestamp: record.outTime
+    }));
+  }
+
+  return [];
+};
+
 // Get all records (History)
 router.get('/', async (req, res) => {
   try {
@@ -61,7 +90,16 @@ router.get('/', async (req, res) => {
       where: filter,
       order: [['outTime', 'DESC']]
     });
-    res.json(records);
+
+    const formattedRecords = records.map(record => {
+      const data = record.toJSON();
+      return {
+        ...data,
+        timeline: normalizeTimeline(data)
+      };
+    });
+
+    res.json(formattedRecords);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching records' });
@@ -142,8 +180,44 @@ router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADM
   }
 });
 
-// Delete a record (Admin only)
-router.delete('/:id', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+// Edit an existing movement record (Super Admin & Admin)
+router.put('/:id', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { employeeName, informTo, visitLocation, purpose, timeline } = req.body;
+
+    const movement = await Movement.findByPk(id);
+    if (!movement) return res.status(404).json({ message: 'Movement not found' });
+
+    if (employeeName) movement.employeeName = employeeName;
+    if (informTo) movement.informTo = informTo;
+
+    if (timeline && Array.isArray(timeline) && timeline.length > 0) {
+      movement.timeline = timeline;
+      movement.changed('timeline', true);
+      movement.visitLocation = timeline.map(t => t.location).filter(Boolean).join(' -> ');
+      movement.purpose = timeline.map(t => t.purpose).filter(Boolean).join(' | ');
+    } else {
+      if (visitLocation !== undefined) movement.visitLocation = visitLocation;
+      if (purpose !== undefined) movement.purpose = purpose;
+    }
+
+    await movement.save();
+
+    const formattedData = {
+      ...movement.toJSON(),
+      timeline: normalizeTimeline(movement.toJSON())
+    };
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error updating movement' });
+  }
+});
+
+// Delete a record (Super Admin only)
+router.delete('/:id', authenticate, authorizeRoles('SUPER_ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const movement = await Movement.findByPk(id);
