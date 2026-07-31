@@ -3,6 +3,7 @@ const router = express.Router();
 const Movement = require('../models/Movement');
 const { Op } = require('sequelize');
 const { authenticate, authorizeRoles } = require('../middleware/auth');
+const { performAutoReturn } = require('../services/autoReturnService');
 
 // Create a new movement
 router.post('/', async (req, res) => {
@@ -107,7 +108,7 @@ router.get('/', async (req, res) => {
 });
 
 // Mark return
-router.put('/:id/return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+router.put('/:id/return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN', 'DUTY_ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const { returnTime } = req.body;
@@ -116,6 +117,7 @@ router.put('/:id/return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), 
     if (!movement) return res.status(404).json({ message: 'Movement not found' });
 
     movement.returnTime = returnTime;
+    movement.returnedBy = req.user.role; // 'ADMIN', 'SUPER_ADMIN', or 'DUTY_ADMIN'
     await movement.save();
 
     res.json(movement);
@@ -125,8 +127,19 @@ router.put('/:id/return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), 
   }
 });
 
+// Trigger manual auto-return sweep (Admins & Duty Admins)
+router.post('/trigger-auto-return', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN', 'DUTY_ADMIN'), async (req, res) => {
+  try {
+    const result = await performAutoReturn();
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error running auto-return process' });
+  }
+});
+
 // Add new location to existing movement
-router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN', 'DUTY_ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
     const { newLocation, newPurpose } = req.body;

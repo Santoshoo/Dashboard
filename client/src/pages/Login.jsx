@@ -158,7 +158,7 @@ export default function Login() {
                       </div>
                       <input
                         type="password"
-                        className="w-full pl-12 pr-6 py-4 rounded-2xl border border-[var(--industrial-border)] bg-[var(--industrial-text)]/5 focus:bg-[var(--industrial-text)]/10 text-[var(--industrial-text)] placeholder-[var(--industrial-text-muted)]/50 focus:ring-4 focus:ring-[#D4AF37]/10 focus:border-[#D4AF37]/60 transition-all duration-500 font-bold outline-none text-sm animate-pulse"
+                        className="w-full pl-12 pr-6 py-4 rounded-2xl border border-[var(--industrial-border)] bg-[var(--industrial-text)]/5 focus:bg-[var(--industrial-text)]/10 text-[var(--industrial-text)] placeholder-[var(--industrial-text-muted)]/50 focus:ring-4 focus:ring-[#D4AF37]/10 focus:border-[#D4AF37]/60 transition-all duration-500 font-bold outline-none text-sm"
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

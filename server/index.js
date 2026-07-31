@@ -10,8 +10,10 @@ const employeeRoutes = require('./routes/employees');
 const Employee = require('./models/Employee');
 const Admin = require('./models/Admin');
 const Movement = require('./models/Movement');
+const DutyAssignment = require('./models/DutyAssignment');
 const bcrypt = require('bcryptjs');
 const cron = require('node-cron');
+const { performAutoReturn } = require('./services/autoReturnService');
 
 const app = express();
 
@@ -159,38 +161,20 @@ const startServer = async () => {
       console.log('🌱 Super Admin seeded successfully (admin/admin123)');
     }
 
-    // Cron job to auto-return employees at 9 PM (21:00)
-    cron.schedule('0 21 * * *', async () => {
-      try {
-        const now = new Date();
-        console.log(`[Cron] Running auto-return check at ${now.toISOString()}`);
-        
-        const openMovements = await Movement.findAll({
-          where: { returnTime: null }
-        });
+    // Perform immediate catch-up check on server startup for open movements past 9 PM IST
+    console.log('[Startup] Running auto-return catch-up check...');
+    await performAutoReturn();
 
-        if (openMovements.length > 0) {
-          for (const movement of openMovements) {
-            movement.returnTime = now;
-            let currentTimeline = movement.timeline || [];
-            if (typeof currentTimeline === 'string') {
-              try { currentTimeline = JSON.parse(currentTimeline); } catch (e) { currentTimeline = []; }
-            }
-            currentTimeline.push({
-              time: now,
-              status: 'Auto-Returned at 9 PM by System'
-            });
-            movement.timeline = currentTimeline;
-            await movement.save();
-          }
-          console.log(`[Cron] Auto-returned ${openMovements.length} employees.`);
-        } else {
-          console.log('[Cron] No open movements found to auto-return.');
-        }
-      } catch (error) {
-        console.error('[Cron] Error during auto-return job:', error);
-      }
-    });
+    // Cron job to auto-return employees at 9 PM IST (21:00 Asia/Kolkata)
+    cron.schedule('0 21 * * *', async () => {
+      console.log('[Cron] Triggering 9 PM IST auto-return job...');
+      await performAutoReturn();
+    }, { timezone: 'Asia/Kolkata' });
+
+    // Periodic fallback check every 15 minutes to handle any server restarts or delayed jobs past 9 PM IST
+    setInterval(async () => {
+      await performAutoReturn();
+    }, 15 * 60 * 1000);
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { sequelize } = require('../config/db');
 const Admin = require('../models/Admin');
+const DutyAssignment = require('../models/DutyAssignment');
+const Employee = require('../models/Employee');
 const { authenticate, authorizeRoles } = require('../middleware/auth');
 
 // Login Route
@@ -25,12 +27,67 @@ router.post('/login', async (req, res) => {
       });
 
       if (!admin) {
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        // Check if employee is assigned as Duty Person for TODAY
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const employee = await Employee.findOne({ where: { id: identifier.trim() } });
+
+        if (employee) {
+          const dutyAssignment = await DutyAssignment.findOne({
+            where: { employeeId: identifier.trim(), dutyDate: todayStr, isActive: true }
+          });
+
+          if (dutyAssignment) {
+            // If dutyAssignment has a password set, verify it
+            if (dutyAssignment.password) {
+              const isPasswordValid = bcrypt.compareSync(password, dutyAssignment.password);
+              if (!isPasswordValid) {
+                return res.status(401).json({ success: false, message: 'Invalid credentials' });
+              }
+            }
+
+            const now = new Date();
+            const endOfDay = new Date(now);
+            endOfDay.setHours(23, 59, 59, 999);
+            const secondsUntilMidnight = Math.max(Math.floor((endOfDay - now) / 1000), 3600);
+
+            const token = jwt.sign(
+              {
+                id: employee.id,
+                username: employee.name,
+                empId: employee.id,
+                employeeId: employee.id,
+                role: 'DUTY_ADMIN',
+                isDutyAdmin: true,
+                dutyDate: todayStr,
+                department: employee.department,
+                location: dutyAssignment.location
+              },
+              process.env.JWT_SECRET,
+              { expiresIn: `${secondsUntilMidnight}s` }
+            );
+
+            return res.json({
+              success: true,
+              token,
+              user: {
+                username: employee.name,
+                empId: employee.id,
+                employeeId: employee.id,
+                role: 'DUTY_ADMIN',
+                isDutyAdmin: true,
+                dutyDate: todayStr,
+                department: employee.department,
+                location: dutyAssignment.location
+              }
+            });
+          }
+        }
+
+        return res.status(401).json({ success: false, message: 'Invalid credentials or no active duty assignment for today' });
       }
 
-      // Check password
-      const isPasswordValid = bcrypt.compareSync(password, admin.password);
-      if (!isPasswordValid) {
+      // Check password for registered Admin
+      if (!bcrypt.compareSync(password, admin.password)) {
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
       }
 
@@ -58,13 +115,67 @@ router.post('/login', async (req, res) => {
         }
       });
     } else {
-      // Public Access - No ID check required
-      const token = jwt.sign(
-        { username: 'Public User', role: 'public' },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-      return res.json({ success: true, token, user: { username: 'Public User', role: 'public' } });
+      // Employee login — check by Employee ID from the Employees table
+      if (!identifier) {
+        return res.status(400).json({ success: false, message: 'Employee ID is required' });
+      }
+
+      // Find employee in Employees table
+      const employee = await Employee.findOne({ where: { id: identifier.trim() } });
+      if (!employee) {
+        return res.status(401).json({ success: false, message: 'Employee ID not found' });
+      }
+
+      // Check if this employee has a duty assignment for TODAY in their department
+      const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const dutyAssignment = await DutyAssignment.findOne({
+        where: { employeeId: identifier.trim(), dutyDate: todayStr, isActive: true, location: employee.department }
+      });
+
+      let role = 'employee';
+      let tokenExpiry = '24h';
+      let tokenPayload = {};
+
+      if (dutyAssignment) {
+        // Issue a DUTY_ADMIN token expiring at end of today (midnight)
+        role = 'DUTY_ADMIN';
+        const now = new Date();
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        const secondsUntilMidnight = Math.floor((endOfDay - now) / 1000);
+        tokenExpiry = `${secondsUntilMidnight}s`;
+        tokenPayload = {
+          username: employee.name,
+          employeeId: employee.id,
+          role: 'DUTY_ADMIN',
+          isDutyAdmin: true,
+          dutyDate: todayStr,
+          department: employee.department,
+          location: dutyAssignment.location
+        };
+      } else {
+        tokenPayload = {
+          username: employee.name,
+          employeeId: employee.id,
+          role: 'employee',
+          department: employee.department
+        };
+      }
+
+      const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: tokenExpiry });
+      return res.json({
+        success: true,
+        token,
+        user: {
+          username: employee.name,
+          employeeId: employee.id,
+          role,
+          isDutyAdmin: !!dutyAssignment,
+          dutyDate: dutyAssignment ? todayStr : null,
+          department: employee.department,
+          location: dutyAssignment ? dutyAssignment.location : null
+        }
+      });
     }
   } catch (error) {
     console.error('Login error:', error);
@@ -242,6 +353,113 @@ router.delete('/admins/:id', authenticate, authorizeRoles('SUPER_ADMIN'), async 
     res.json({ success: true, message: 'Admin account deleted successfully' });
   } catch (error) {
     console.error('Delete admin error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+module.exports = router;
+
+// ─── Duty Assignment Routes ───────────────────────────────────────────────────
+
+// GET /api/auth/duty-today — Public: check active duty assignments for today (both locations)
+router.get('/duty-today', async (req, res) => {
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const duties = await DutyAssignment.findAll({
+      where: { dutyDate: todayStr, isActive: true }
+    });
+    const result = {};
+    duties.forEach(d => { result[d.location] = d.employeeName; });
+    return res.json({
+      success: true,
+      hasDuty: duties.length > 0,
+      duties: result // e.g. { 'IT DATA CENTER': 'Santosh', 'IT COMMAND CENTER': 'Rajesh' }
+    });
+  } catch (error) {
+    console.error('Duty today check error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/auth/duty-assignments — Admin: list all duty assignments
+router.get('/duty-assignments', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const assignments = await DutyAssignment.findAll({
+      order: [['dutyDate', 'DESC']]
+    });
+    res.json({ success: true, assignments });
+  } catch (error) {
+    console.error('Fetch duty assignments error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/auth/duty-assignments — Admin: create a new duty assignment
+router.post('/duty-assignments', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  const { employeeId, employeeName, dutyDate, location, password } = req.body;
+  try {
+    if (!employeeId || !employeeName || !dutyDate || !location || !password) {
+      return res.status(400).json({ success: false, message: 'Employee ID, name, duty date, location, and duty password are required' });
+    }
+
+    const validLocations = ['IT DATA CENTER', 'IT COMMAND CENTER'];
+    if (!validLocations.includes(location)) {
+      return res.status(400).json({ success: false, message: 'Invalid location. Must be IT DATA CENTER or IT COMMAND CENTER' });
+    }
+
+    // Prevent assigning past dates
+    const today = new Date().toISOString().slice(0, 10);
+    if (dutyDate < today) {
+      return res.status(400).json({ success: false, message: 'Cannot assign duty for a past date' });
+    }
+
+    // Enforce one duty person per location per day
+    const existing = await DutyAssignment.findOne({ where: { dutyDate, location, isActive: true } });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: `${existing.employeeName} is already assigned as duty person for ${location} on ${dutyDate}. Please cancel that assignment first.`
+      });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const assignedBy = req.user.username || req.user.empId || 'Admin';
+    const assignment = await DutyAssignment.create({
+      employeeId,
+      employeeName,
+      location,
+      dutyDate,
+      assignedBy,
+      password: hashedPassword,
+      isActive: true
+    });
+
+    res.status(201).json({ success: true, assignment, message: `${employeeName} assigned as holiday duty person for ${location} on ${dutyDate}` });
+  } catch (error) {
+    console.error('Create duty assignment error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/auth/duty-assignments/:id — Admin: cancel a duty assignment
+router.delete('/duty-assignments/:id', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const assignment = await DutyAssignment.findByPk(id);
+    if (!assignment) {
+      return res.status(404).json({ success: false, message: 'Duty assignment not found' });
+    }
+
+    // Prevent cancelling past/today assignments that have already been used
+    const today = new Date().toISOString().slice(0, 10);
+    if (assignment.dutyDate <= today) {
+      return res.status(400).json({ success: false, message: 'Cannot cancel a duty assignment for today or a past date' });
+    }
+
+    await assignment.destroy();
+    res.json({ success: true, message: `Duty assignment for ${assignment.employeeName} on ${assignment.dutyDate} has been cancelled` });
+  } catch (error) {
+    console.error('Delete duty assignment error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

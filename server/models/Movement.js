@@ -45,6 +45,10 @@ const Movement = sequelize.define('Movement', {
   timeline: {
     type: DataTypes.JSON,
     allowNull: true,
+  },
+  returnedBy: {
+    type: DataTypes.STRING, // 'ADMIN', 'DUTY_ADMIN', 'AUTO_CRON'
+    allowNull: true,
   }
 }, {
   timestamps: true,

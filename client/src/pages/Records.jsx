@@ -4,10 +4,22 @@ import { Clock, History, Trash2, MapPin, MessageSquare, Search, Shield, Sparkles
 import { usePagination, Pagination } from '../utils';
 import * as XLSX from 'xlsx';
 
+import ConfirmModal from '../components/ConfirmModal';
+
 export default function Records() {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [user, setUser] = useState(null);
+
+  // Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    confirmVariant: 'danger',
+    onConfirm: () => {},
+  });
   const [searchName, setSearchName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -77,14 +89,24 @@ export default function Records() {
     }
   };
 
-  const handleDeleteRecord = async (id) => {
-    if (window.confirm('Are you sure you want to delete this record?')) {
-      try {
-        const response = await fetch(`/api/movements/${id}`, { method: 'DELETE' });
-        if (response.ok) fetchRecords(user);
-      } catch (err) {
-        console.error('Failed to delete record:', err);
-      }
+  const handleDeleteRecord = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete History Record',
+      message: 'Are you sure you want to delete this movement record permanently?',
+      confirmText: 'Delete Record',
+      confirmVariant: 'danger',
+      onConfirm: () => executeDeleteRecord(id),
+    });
+  };
+
+  const executeDeleteRecord = async (id) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+    try {
+      const response = await fetch(`/api/movements/${id}`, { method: 'DELETE' });
+      if (response.ok) fetchRecords(user);
+    } catch (err) {
+      console.error('Failed to delete record:', err);
     }
   };
 
@@ -527,6 +549,17 @@ export default function Records() {
           />
         </div>
       </main>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        confirmVariant={confirmModal.confirmVariant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

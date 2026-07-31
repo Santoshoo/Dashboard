@@ -4,11 +4,23 @@ import { LogOut, Clock, User, Info, FileText, CheckCircle, History, Trash2, MapP
 import { MANAGERS, LOCATIONS, MANAGER_LOCATIONS } from '../constants';
 import { usePagination, Pagination } from '../utils';
 
+import ConfirmModal from '../components/ConfirmModal';
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [user, setUser] = useState(null);
+
+  // Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    confirmVariant: 'danger',
+    onConfirm: () => {},
+  });
 
   // Location Selector State
   const [selectedLocation, setSelectedLocation] = useState(localStorage.getItem('selectedLocation') || 'IT DATA CENTER');
@@ -383,9 +395,19 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeleteActiveRecord = async (id, empName) => {
-    if (!window.confirm(`Are you sure you want to delete the active movement record for "${empName}"?`)) return;
+  const handleDeleteActiveRecord = (id, empName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Active Movement',
+      message: `Are you sure you want to delete the active movement record for "${empName}"?`,
+      confirmText: 'Delete Record',
+      confirmVariant: 'danger',
+      onConfirm: () => executeDeleteActiveRecord(id),
+    });
+  };
 
+  const executeDeleteActiveRecord = async (id) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     const token = sessionStorage.getItem('token');
     try {
       const response = await fetch(`/api/movements/${id}`, {
@@ -399,7 +421,7 @@ export default function Dashboard() {
         fetchRecords(user);
       } else {
         const data = await response.json();
-        alert(data.message || 'Failed to delete record.');
+        setFormError(data.message || 'Failed to delete record.');
       }
     } catch (err) {
       console.error('Failed to delete record:', err);
@@ -427,14 +449,14 @@ export default function Dashboard() {
   };
 
   const canMarkReturn = (record) => {
-    if (!isAdmin || !user) return false;
+    if (!user) return false;
+    if (!isAdmin) return false;
 
     // SUPER_ADMIN can mark return for any location
     if (user.role === 'SUPER_ADMIN') return true;
 
-    // ADMIN can only mark return if:
-    // Employee's department matches admin's location
-    const adminLocation = user.location || 'IT DATA CENTER';
+    // ADMIN and DUTY_ADMIN can only mark return if employee's department matches their location
+    const adminLocation = user.location || user.department || 'IT DATA CENTER';
     const employeeDept = record.employeeDepartment;
 
     return adminLocation === employeeDept;
@@ -497,9 +519,20 @@ export default function Dashboard() {
     }
   };
 
-  const handleToggleEmployee = async (id, name, currentStatus) => {
+  const handleToggleEmployee = (id, name, currentStatus) => {
     const action = currentStatus ? 'deactivate' : 'activate';
-    if (!window.confirm(`Are you sure you want to ${action} "${name}"?`)) return;
+    setConfirmModal({
+      isOpen: true,
+      title: `${currentStatus ? 'Deactivate' : 'Activate'} Employee`,
+      message: `Are you sure you want to ${action} "${name}"?`,
+      confirmText: currentStatus ? 'Deactivate' : 'Activate',
+      confirmVariant: currentStatus ? 'warning' : 'primary',
+      onConfirm: () => executeToggleEmployee(id, name),
+    });
+  };
+
+  const executeToggleEmployee = async (id, name) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     const token = sessionStorage.getItem('token');
     try {
       const res = await fetch(`/api/employees/${id}/toggle`, {
@@ -518,7 +551,7 @@ export default function Dashboard() {
     }
   };
 
-  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'DUTY_ADMIN';
   const isPublic = user?.role === 'public';
 
   const activeRecords = records.filter(r => {
@@ -528,7 +561,7 @@ export default function Dashboard() {
     // Admins filter by their specific location (except SUPER_ADMIN sees all)
     if (isAdmin) {
       if (user?.role !== 'SUPER_ADMIN') {
-        const adminLocation = user?.location || 'IT DATA CENTER';
+        const adminLocation = user?.location || user?.department || 'IT DATA CENTER';
         if (r.employeeDepartment !== adminLocation) return false;
       }
     } else {
@@ -787,13 +820,13 @@ export default function Dashboard() {
 
                 {isAdmin ? (
                   <>
-                    {user?.role === 'SUPER_ADMIN' && (
+                    {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
                       <button
                         onClick={() => navigate('/admin-management')}
                         className="hidden md:flex items-center bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] transition-all duration-300 px-5 py-2.5 rounded-2xl text-sm font-bold border border-[#D4AF37]/20 mr-2"
                       >
                         <Shield className="w-4 h-4 mr-2" />
-                        Admin Management
+                        {user?.role === 'SUPER_ADMIN' ? 'Admin Management' : 'Duty Management'}
                       </button>
                     )}
                     <button
@@ -835,6 +868,29 @@ export default function Dashboard() {
         </div>
       </nav>
 
+      {/* ── Holiday Duty Banner ── */}
+      {user?.role === 'DUTY_ADMIN' && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 backdrop-blur-xl sticky top-16 z-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0 animate-pulse">
+                <Shield className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-amber-400 uppercase tracking-widest">🛡️ Holiday Duty Active</p>
+                <p className="text-[10px] font-bold text-amber-300/70 mt-0.5">
+                  You have been granted temporary admin access for today — {user.dutyDate || new Date().toLocaleDateString()}. Access expires at midnight.
+                </p>
+              </div>
+            </div>
+            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/25 text-[10px] font-black text-amber-400 uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              On Duty
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Location Selector (Only for non-admin users) ── */}
       {!isAdmin && (
         <div className="bg-(--industrial-bg)/95 backdrop-blur-xl border-b border-(--industrial-border) sticky top-16 z-20">
@@ -868,9 +924,14 @@ export default function Dashboard() {
             <h2 className="text-2xl md:text-3xl font-black text-(--industrial-text) tracking-tight">
               {isAdmin ? `Welcome, ${user.username}` : 'Employee Movement Portal'}
             </h2>
-            {isAdmin && user.role !== 'SUPER_ADMIN' && (
+            {isAdmin && user.role !== 'SUPER_ADMIN' && user.role !== 'DUTY_ADMIN' && (
               <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest mt-1 mb-2">
                 Assigned Location: {user.location || 'IT DATA CENTER'}
+              </p>
+            )}
+            {user.role === 'DUTY_ADMIN' && (
+              <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mt-1 mb-2">
+                🛡️ Duty Admin — {user.department || 'IT DATA CENTER'}
               </p>
             )}
             <p className="text-(--industrial-text-muted) font-bold mt-1 text-sm flex items-center">
@@ -879,6 +940,16 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {/* DUTY_ADMIN also gets New Movement button to record employee OUT */}
+          {user?.role === 'DUTY_ADMIN' && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center justify-center bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 transform hover:-translate-y-0.5 active:scale-[0.98] group"
+            >
+              <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
+              Record Movement
+            </button>
+          )}
           {!isAdmin && (
             <button
               onClick={() => setShowForm(true)}
@@ -1076,17 +1147,19 @@ export default function Dashboard() {
                           {isAdmin ? (
                             canMarkReturn(record) ? (
                               <div className="flex gap-2">
-                                {/* Edit Button for Admin & Super Admin */}
-                                <button
-                                  onClick={() => handleOpenEditModal(record)}
-                                  className="h-10 lg:h-12 px-3 lg:px-4 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
-                                  title="Edit Movement (Fix Mistake)"
-                                >
-                                  <Pencil className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-1.5" />
-                                  <span className="hidden lg:inline">Edit</span>
-                                </button>
+                                {/* Edit Button — only for ADMIN and SUPER_ADMIN, not DUTY_ADMIN */}
+                                {user?.role !== 'DUTY_ADMIN' && (
+                                  <button
+                                    onClick={() => handleOpenEditModal(record)}
+                                    className="h-10 lg:h-12 px-3 lg:px-4 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                    title="Edit Movement (Fix Mistake)"
+                                  >
+                                    <Pencil className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-1.5" />
+                                    <span className="hidden lg:inline">Edit</span>
+                                  </button>
+                                )}
 
-                                {/* Delete Button for Super Admin only */}
+                                {/* Delete Button — only for SUPER_ADMIN */}
                                 {user?.role === 'SUPER_ADMIN' && (
                                   <button
                                     onClick={() => handleDeleteActiveRecord(record.id, record.employeeName)}
@@ -1113,10 +1186,14 @@ export default function Dashboard() {
                                 )}
                                 <button
                                   onClick={() => handleReturn(record.id)}
-                                  className="h-10 lg:h-12 px-4 lg:px-6 bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0B0F19] rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-[#D4AF37]/30 hover:border-[#D4AF37] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                  className={`h-10 lg:h-12 px-4 lg:px-6 rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 whitespace-nowrap uppercase tracking-widest shrink-0 ${
+                                    user?.role === 'DUTY_ADMIN'
+                                      ? 'bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]'
+                                      : 'bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0B0F19] border-[#D4AF37]/30 hover:border-[#D4AF37] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)]'
+                                  }`}
                                 >
                                   <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2.5" />
-                                  Return
+                                  {user?.role === 'DUTY_ADMIN' ? 'Returned' : 'Return'}
                                 </button>
                               </div>
                             ) : (
@@ -1562,6 +1639,17 @@ export default function Dashboard() {
         )}
 
       </main>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        confirmVariant={confirmModal.confirmVariant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
