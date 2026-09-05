@@ -19,7 +19,7 @@ export default function Dashboard() {
     message: '',
     confirmText: 'Confirm',
     confirmVariant: 'danger',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   // Location Selector State
@@ -85,7 +85,8 @@ export default function Dashboard() {
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [informTo, setInformTo] = useState('');
   const [customInformTo, setCustomInformTo] = useState('');
-  const [visitLocation, setVisitLocation] = useState('');
+  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [customLocation, setCustomLocation] = useState('');
   const [purpose, setPurpose] = useState('');
 
@@ -95,7 +96,8 @@ export default function Dashboard() {
     setEmployeeName('');
     setInformTo('');
     setCustomInformTo('');
-    setVisitLocation('');
+    setSelectedLocations([]);
+    setShowLocationPicker(false);
     setCustomLocation('');
     setPurpose('');
     setFormError('');
@@ -196,7 +198,8 @@ export default function Dashboard() {
   const resetForm = () => {
     setInformTo('');
     setCustomInformTo('');
-    setVisitLocation('');
+    setSelectedLocations([]);
+    setShowLocationPicker(false);
     setCustomLocation('');
     setPurpose('');
     setEmployeeSearchInput('');
@@ -209,18 +212,35 @@ export default function Dashboard() {
     e.preventDefault();
     setFormError('');
     if (!employeeName || !informTo || !purpose) return;
+    if (selectedLocations.length === 0) {
+      setFormError('Please select at least one visit location.');
+      return;
+    }
+
+    // Build locations array — replace 'Others' with custom text
+    const finalLocations = selectedLocations.map(loc =>
+      loc === 'Others' ? (customLocation || 'Others') : loc
+    );
+
+    const now = new Date().toISOString();
+    const timeline = finalLocations.map(loc => ({
+      location: loc,
+      purpose: purpose,
+      timestamp: now
+    }));
 
     const newRecord = {
       id: Date.now().toString(),
       employeeName,
       employeeId: user.employeeId || 'PUBLIC',
-      outTime: new Date().toISOString(),
+      outTime: now,
       returnTime: null,
       informTo: informTo === 'Others' ? customInformTo : informTo,
-      visitLocation: visitLocation === 'Others' ? customLocation : visitLocation,
+      visitLocation: finalLocations.join(' -> '),
       purpose,
       date: new Date().toLocaleDateString(),
-      employeeDepartment: selectedLocation
+      employeeDepartment: selectedLocation,
+      timeline
     };
 
     try {
@@ -233,7 +253,7 @@ export default function Dashboard() {
       if (response.ok) {
         fetchRecords(user);
         resetForm();
-        setShowForm(false); // Close drawer on success
+        setShowForm(false);
       } else {
         const errorData = await response.json();
         setFormError(errorData.message || 'Failed to create movement.');
@@ -271,13 +291,11 @@ export default function Dashboard() {
     const finalLocation = addVisitLocation === 'Others' ? addCustomLocation : addVisitLocation;
     if (!finalLocation || !addPurpose) return;
 
-    const token = sessionStorage.getItem('token');
     try {
       const response = await fetch(`/api/movements/${currentRecordId}/add-location`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ newLocation: finalLocation, newPurpose: addPurpose })
       });
@@ -651,7 +669,7 @@ export default function Dashboard() {
 
                 {/* Dropdown List */}
                 {showEmployeeDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-(--industrial-card) border border-(--industrial-border) rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-(--industrial-card) border border-(--industrial-border) rounded-xl shadow-2xl z-[60] max-h-48 overflow-y-auto">
                     {employees
                       .filter(emp =>
                         emp.isActive !== false &&
@@ -724,19 +742,99 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Visit Location */}
-            <div>
-              <label className="block text-[10px] font-black text-(--industrial-text-muted) uppercase tracking-widest mb-2 ml-1">Visit Location</label>
-              <select
-                className="w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-[#D4AF37]/10 focus:border-[#D4AF37]/40 transition-all duration-300 bg-(--industrial-text)/5 font-bold text-xs text-(--industrial-text) cursor-pointer outline-none appearance-none"
-                value={visitLocation}
-                onChange={(e) => setVisitLocation(e.target.value)}
-                required
+            {/* Visit Location — Multi-Select Checkbox Picker */}
+            <div className="relative">
+              <label className="block text-[10px] font-black text-(--industrial-text-muted) uppercase tracking-widest mb-2 ml-1">Visit Location(s)</label>
+              
+              {/* Selected location chips */}
+              {selectedLocations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {selectedLocations.map(loc => (
+                    <span
+                      key={loc}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#D4AF37]/15 text-[#D4AF37] text-[10px] font-black border border-[#D4AF37]/25"
+                    >
+                      {loc === 'Others' ? (customLocation || 'Others') : loc}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocations(prev => prev.filter(l => l !== loc));
+                          if (loc === 'Others') setCustomLocation('');
+                        }}
+                        className="ml-0.5 hover:text-red-400 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Click-outside overlay — rendered BEFORE dropdown so dropdown sits on top */}
+              {showLocationPicker && (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowLocationPicker(false)}
+                />
+              )}
+
+              {/* Dropdown trigger */}
+              <button
+                type="button"
+                onClick={() => setShowLocationPicker(prev => !prev)}
+                className="relative z-50 w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-[#D4AF37]/10 focus:border-[#D4AF37]/40 transition-all duration-300 bg-(--industrial-text)/5 font-bold text-xs text-(--industrial-text) cursor-pointer outline-none flex items-center justify-between"
               >
-                <option value="" disabled className="bg-(--industrial-card) text-(--industrial-text)">Select location</option>
-                {LOCATIONS.map(loc => <option key={loc} value={loc} className="bg-(--industrial-card) text-(--industrial-text)">{loc}</option>)}
-              </select>
-              {visitLocation === 'Others' && (
+                <span className={selectedLocations.length === 0 ? 'text-(--industrial-text-muted)' : 'text-(--industrial-text)'}>
+                  {selectedLocations.length === 0
+                    ? 'Select location(s)'
+                    : `${selectedLocations.length} location${selectedLocations.length > 1 ? 's' : ''} selected`}
+                </span>
+                {showLocationPicker
+                  ? <ChevronUp className="w-4 h-4 text-(--industrial-text-muted)" />
+                  : <ChevronDown className="w-4 h-4 text-(--industrial-text-muted)" />
+                }
+              </button>
+
+              {/* Checkbox dropdown — z-50 so it sits above the z-40 overlay */}
+              {showLocationPicker && (
+                <div className="relative z-50 mt-2 bg-(--industrial-card) border border-(--industrial-border) rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                  {LOCATIONS.map(loc => {
+                    const isChecked = selectedLocations.includes(loc);
+                    const isDisabled = !isChecked && selectedLocations.length >= 5;
+                    return (
+                      <label
+                        key={loc}
+                        className={`flex items-center px-4 py-2.5 text-xs font-bold transition-colors border-b border-(--industrial-border)/30 last:border-b-0 cursor-pointer ${
+                          isDisabled
+                            ? 'opacity-40 cursor-not-allowed'
+                            : isChecked
+                              ? 'bg-[#D4AF37]/10 text-[#D4AF37]'
+                              : 'text-(--industrial-text) hover:bg-(--industrial-text)/5'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mr-3 accent-[#D4AF37] w-4 h-4 rounded"
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedLocations(prev => prev.filter(l => l !== loc));
+                              if (loc === 'Others') setCustomLocation('');
+                            } else if (!isDisabled) {
+                              setSelectedLocations(prev => [...prev, loc]);
+                            }
+                          }}
+                        />
+                        {loc}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Custom location input when 'Others' is selected */}
+              {selectedLocations.includes('Others') && (
                 <input
                   type="text"
                   className="mt-2 w-full px-4 py-2.5 rounded-xl border border-(--industrial-border) focus:ring-4 focus:ring-[#D4AF37]/10 focus:border-[#D4AF37]/40 transition-all duration-300 bg-(--industrial-text)/5 font-bold text-xs text-(--industrial-text) outline-none"
@@ -745,6 +843,10 @@ export default function Dashboard() {
                   onChange={(e) => setCustomLocation(e.target.value)}
                   required
                 />
+              )}
+
+              {selectedLocations.length >= 5 && (
+                <p className="text-[9px] font-bold text-amber-400 mt-1.5 ml-1">Maximum 5 locations reached</p>
               )}
             </div>
 
@@ -1048,10 +1150,10 @@ export default function Dashboard() {
               <div className="space-y-2">
                 {paginatedActiveRecords.map(record => {
                   const isOver2Hours = !isAdmin && record.outTime && (currentTime - new Date(record.outTime)) > 2 * 60 * 60 * 1000;
-                  
+
                   // Compute timeline for UI
                   let displayTimeline = record.timeline;
-                  
+
                   // Safely parse timeline if it was stored as a JSON string in the database
                   if (typeof displayTimeline === 'string') {
                     try {
@@ -1070,7 +1172,7 @@ export default function Dashboard() {
                       timestamp: record.outTime // Fallback timestamp for legacy records
                     }));
                   }
-                  
+
                   // Final fallback to prevent .map crashes
                   if (!Array.isArray(displayTimeline)) {
                     displayTimeline = [];
@@ -1124,7 +1226,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div className="flex items-start mt-2 ml-1 opacity-80">
-                            <span className="text-[#D4AF37] mr-1 shrink-0 mt-0.5">↳</span> 
+                            <span className="text-[#D4AF37] mr-1 shrink-0 mt-0.5">↳</span>
                             <span className="font-black text-blue-500 whitespace-normal wrap-break-word leading-relaxed min-w-0">
                               "{record.purpose ? record.purpose.split('|')[0].trim() : ''}"
                             </span>
@@ -1147,6 +1249,21 @@ export default function Dashboard() {
                           {isAdmin ? (
                             canMarkReturn(record) ? (
                               <div className="flex gap-2">
+                                {/* Add Location Button — available to all admin levels */}
+                                {(record.visitLocation ? record.visitLocation.split('->').length : 1) < 5 && (
+                                  <button
+                                    onClick={() => {
+                                      setCurrentRecordId(record.id);
+                                      setShowAddLocationModal(true);
+                                    }}
+                                    className="h-10 lg:h-12 px-3 lg:px-4 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                    title="Add Location"
+                                  >
+                                    <MapPin className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-1.5" />
+                                    <span className="hidden lg:inline">Add</span>
+                                  </button>
+                                )}
+
                                 {/* Edit Button — only for ADMIN and SUPER_ADMIN, not DUTY_ADMIN */}
                                 {user?.role !== 'DUTY_ADMIN' && (
                                   <button
@@ -1171,26 +1288,12 @@ export default function Dashboard() {
                                   </button>
                                 )}
 
-                                {(record.visitLocation ? record.visitLocation.split('->').length : 1) < 5 && (
-                                  <button
-                                    onClick={() => {
-                                      setCurrentRecordId(record.id);
-                                      setShowAddLocationModal(true);
-                                    }}
-                                    className="h-10 lg:h-12 px-3 lg:px-4 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
-                                    title="Add Location"
-                                  >
-                                    <MapPin className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2" />
-                                    <span className="hidden lg:inline">Add</span>
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => handleReturn(record.id)}
-                                  className={`h-10 lg:h-12 px-4 lg:px-6 rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 whitespace-nowrap uppercase tracking-widest shrink-0 ${
-                                    user?.role === 'DUTY_ADMIN'
+                                  className={`h-10 lg:h-12 px-4 lg:px-6 rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 whitespace-nowrap uppercase tracking-widest shrink-0 ${user?.role === 'DUTY_ADMIN'
                                       ? 'bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white border-amber-500/30 hover:border-amber-500 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]'
                                       : 'bg-[#D4AF37]/10 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-[#0B0F19] border-[#D4AF37]/30 hover:border-[#D4AF37] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)]'
-                                  }`}
+                                    }`}
                                 >
                                   <CheckCircle className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2.5" />
                                   {user?.role === 'DUTY_ADMIN' ? 'Returned' : 'Return'}
@@ -1203,12 +1306,28 @@ export default function Dashboard() {
                               </div>
                             )
                           ) : (
-                            <div className="h-12 px-8 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl text-xs font-black flex items-center justify-center border-2 border-[#D4AF37]/20 shadow-[0_0_15px_rgba(212,175,55,0.1)] whitespace-nowrap uppercase tracking-widest">
-                              <Clock className="w-5 h-5 mr-2.5 animate-spin-slow" style={{ animationDuration: '3s' }} />
-                              Currently Out
+                            <div className="flex gap-2">
+                              {/* Add Location button — visible to all users */}
+                              {(record.visitLocation ? record.visitLocation.split('->').length : 1) < 5 && (
+                                <button
+                                  onClick={() => {
+                                    setCurrentRecordId(record.id);
+                                    setShowAddLocationModal(true);
+                                  }}
+                                  className="h-10 lg:h-12 px-3 lg:px-4 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-center border-2 border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] whitespace-nowrap uppercase tracking-widest shrink-0"
+                                  title="Add Location"
+                                >
+                                  <MapPin className="w-4 h-4 lg:w-5 lg:h-5 lg:mr-2" />
+                                  <span className="hidden lg:inline">Add</span>
+                                </button>
+                              )}
+                              <div className="h-12 px-8 bg-[#D4AF37]/10 text-[#D4AF37] rounded-xl text-xs font-black flex items-center justify-center border-2 border-[#D4AF37]/20 shadow-[0_0_15px_rgba(212,175,55,0.1)] whitespace-nowrap uppercase tracking-widest">
+                                <Clock className="w-5 h-5 mr-2.5 animate-spin-slow" style={{ animationDuration: '3s' }} />
+                                Currently Out
+                              </div>
                             </div>
                           )}
-                          
+
                           {/* Timeline Toggle Button */}
                           {displayTimeline && displayTimeline.length > 1 && (
                             <button
@@ -1232,12 +1351,12 @@ export default function Dashboard() {
                           <div className="relative pl-6 space-y-6">
                             {/* Vertical Line */}
                             <div className="absolute left-2.75 top-2 bottom-2 w-0.5 bg-(--industrial-border)"></div>
-                            
+
                             {displayTimeline.slice(1).map((item, index) => (
                               <div key={index} className="relative flex items-start justify-between">
                                 {/* Dot */}
                                 <div className="absolute -left-5.5 top-1 w-3 h-3 rounded-full border-2 border-[#D4AF37] bg-(--industrial-card) shadow-[0_0_8px_rgba(212,175,55,0.5)]"></div>
-                                
+
                                 <div className="flex-1 pr-4">
                                   <p className="text-sm font-black text-(--industrial-text)">
                                     <span className="text-[#D4AF37] mr-2">Assignment {index + 2}</span>
@@ -1422,8 +1541,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Add Location Modal (Admin only) ── */}
-        {isAdmin && showAddLocationModal && (
+        {/* ── Add Location Modal (Available to all users) ── */}
+        {showAddLocationModal && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
             {/* Backdrop */}
             <div

@@ -22,12 +22,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Employee is already out. Please return first or add a new location to the current trip.' });
     }
 
-    // Initialize timeline with the first assignment
-    const initialTimeline = [{
-      location: visitLocation,
-      purpose: purpose,
-      timestamp: outTime
-    }];
+    // Use client-provided timeline (multi-select) or build a single-entry one
+    const timeline = req.body.timeline && Array.isArray(req.body.timeline) && req.body.timeline.length > 0
+      ? req.body.timeline
+      : [{ location: visitLocation, purpose: purpose, timestamp: outTime }];
+
+    const initialTimeline = timeline;
 
     const movement = await Movement.create({
       id,
@@ -138,8 +138,8 @@ router.post('/trigger-auto-return', authenticate, authorizeRoles('SUPER_ADMIN', 
   }
 });
 
-// Add new location to existing movement
-router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN', 'DUTY_ADMIN'), async (req, res) => {
+// Add new location to existing movement (public — any user can add to their active trip)
+router.put('/:id/add-location', async (req, res) => {
   try {
     const { id } = req.params;
     const { newLocation, newPurpose } = req.body;
@@ -183,7 +183,7 @@ router.put('/:id/add-location', authenticate, authorizeRoles('SUPER_ADMIN', 'ADM
     movement.changed('timeline', true);
     movement.visitLocation = movement.visitLocation ? `${movement.visitLocation} -> ${newLocation}` : newLocation;
     movement.purpose = movement.purpose ? `${movement.purpose} | ${newPurpose}` : newPurpose;
-    
+
     await movement.save();
 
     res.json(movement);
